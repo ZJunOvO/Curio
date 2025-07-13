@@ -11,8 +11,8 @@ import {
   Shield, Crown, Zap, Plus, Trash2, BookOpen, Share2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { usePlanStore } from '@/lib/stores/usePlanStore';
-import { type Plan, type PlanApproval, type PlanVersion, type PlanPath, type PlanActivity } from '@/lib/mock-plans';
+import { useAuth } from '@/hooks/useAuth';
+import { getPlanDetails, updatePlan, type Plan } from '@/lib/supabase/database';
 import { toast } from '@/lib/stores/useToastStore';
 import { PlanStatsDashboard } from '@/components/core/charts';
 import { ShareModal } from '@/components/core';
@@ -283,7 +283,7 @@ const VersionView: React.FC<{ plan: Plan }> = ({ plan }) => {
 };
 
 // 成员管理组件
-const MembersSection: React.FC<{ plan: Plan, onUpdate: (updatedPlan: Plan) => void }> = ({ plan, onUpdate }) => {
+const MembersSection: React.FC<{ plan: any, onUpdate: (updates: any) => void }> = ({ plan, onUpdate }) => {
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
 
@@ -565,8 +565,8 @@ const NewPathEditor: React.FC<{
 
 // 计划路径组件 - 最终修复版
 const PathsSection: React.FC<{
-  plan: Plan;
-  onUpdate: (updatedPlan: Plan) => void;
+  plan: any;
+  onUpdate: (updates: any) => void;
 }> = ({ plan, onUpdate }) => {
   const [editingPathId, setEditingPathId] = useState<string | null>(null);
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
@@ -576,7 +576,7 @@ const PathsSection: React.FC<{
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   // --- Helper to recalculate plan status ---
-  const recalculatePlanStatus = (paths: PlanPath[]): { status: Plan['status'], progress: number, metrics: Plan['metrics'] } => {
+  const recalculatePlanStatus = (paths: any[]) => {
     // 改进：基于所有里程碑的完成情况来计算进度，而不仅仅是路径状态
     const totalMilestones = paths.reduce((total, path) => total + path.milestones.length, 0);
     
@@ -619,7 +619,7 @@ const PathsSection: React.FC<{
 
   // --- Path Logic ---
   const addPath = (title: string) => {
-    const newPath: PlanPath = {
+    const newPath = {
       id: generateId(),
       title,
       description: '请填写路径描述',
@@ -707,7 +707,7 @@ const PathsSection: React.FC<{
   const updateMilestone = (pathId: string, milestoneId: string, updates: Partial<any>) => {
     let milestoneTitle = '';
     let milestoneCompleted: boolean | undefined;
-    let newActivities: PlanActivity[] = [];
+    let newActivities: any[] = [];
 
     const updatedPaths = plan.paths.map(path => {
       if (path.id === pathId) {
@@ -725,7 +725,7 @@ const PathsSection: React.FC<{
 
         // Check if all milestones in this path are completed
         const allMilestonesCompleted = updatedMilestones.every(m => m.completed);
-        const newPathStatus: PlanPath['status'] = allMilestonesCompleted ? 'completed' : 'in_progress';
+        const newPathStatus = allMilestonesCompleted ? 'completed' : 'in_progress';
         
         if (originalPath.status !== newPathStatus) {
            newActivities.push(createActivity('status_change', `路径 "${originalPath.title}" 的状态更新为: ${newPathStatus === 'completed' ? '已完成' : '进行中'}`));
@@ -778,7 +778,7 @@ const PathsSection: React.FC<{
         const completedCount = currentPath.milestones.filter(m => m.completed).length;
         const progress = currentPath.milestones.length > 0 ? Math.round((completedCount / currentPath.milestones.length) * 100) : 0;
         
-        let newPathStatus: PlanPath['status'] = 'planning';
+        let newPathStatus = 'planning';
         if (currentPath.milestones.length > 0) {
           if (progress === 100) {
             newPathStatus = 'completed';
@@ -1060,23 +1060,33 @@ const ActivitySection: React.FC<{ plan: Plan }> = ({ plan }) => {
 // 主页面组件
 export default function PlanDetailPage() {
   const params = useParams();
-  const { getPlanById, updatePlan, initializePlans } = usePlanStore();
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const { user } = useAuth();
+  const [plan, setPlan] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'paths' | 'versions' | 'members' | 'approvals' | 'activity' | 'stats'>('overview');
-  const [localPlan, setLocalPlan] = useState<Plan | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
-    // 确保数据已初始化
-    initializePlans();
-    
-    const planId = params.id as string;
-    const foundPlan = getPlanById(planId);
-    setPlan(foundPlan || null);
-    setLocalPlan(foundPlan || null); // 初始化localPlan
-  }, [params.id, getPlanById, initializePlans]);
+    if (user && params.id) {
+      loadPlan();
+    }
+  }, [params.id, user]);
 
-  if (!plan || !localPlan) {
+  const loadPlan = async () => {
+    try {
+      setLoading(true);
+      const planId = params.id as string;
+      const planData = await getPlanDetails(planId);
+      setPlan(planData);
+    } catch (error) {
+      console.error('加载计划失败:', error);
+      toast.error('加载失败', '无法加载计划详情');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading || !plan) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
         <div className="text-center">
@@ -1087,13 +1097,15 @@ export default function PlanDetailPage() {
     );
   }
 
-  const handlePlanUpdate = (updatedPlan: Plan) => {
-    // 立即更新本地状态
-    setLocalPlan(updatedPlan);
-    setPlan(updatedPlan);
-    
-    // 立即更新全局状态（这会触发localStorage持久化）
-    updatePlan(updatedPlan.id, updatedPlan);
+  const handlePlanUpdate = async (updates: any) => {
+    try {
+      const updatedPlan = await updatePlan(plan.id, updates);
+      setPlan({ ...plan, ...updatedPlan });
+      toast.success('更新成功', '计划已保存');
+    } catch (error) {
+      console.error('更新计划失败:', error);
+      toast.error('更新失败', '请稍后重试');
+    }
   };
 
   return (
@@ -1181,18 +1193,18 @@ export default function PlanDetailPage() {
                     strokeWidth="8"
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 56}`}
-                    strokeDashoffset={`${2 * Math.PI * 56 * (1 - localPlan.progress / 100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 56 * (1 - (plan.progress || 0) / 100)}`}
                     className={cn(
-                      localPlan.progress >= 80 ? 'text-green-500' :
-                      localPlan.progress >= 50 ? 'text-blue-500' :
-                      localPlan.progress >= 30 ? 'text-yellow-500' :
+                      (plan.progress || 0) >= 80 ? 'text-green-500' :
+                      (plan.progress || 0) >= 50 ? 'text-blue-500' :
+                      (plan.progress || 0) >= 30 ? 'text-yellow-500' :
                       'text-gray-400',
                       "transition-all duration-1000"
                     )}
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold">{localPlan.progress}%</span>
+                  <span className="text-3xl font-bold">{plan.progress || 0}%</span>
                   <span className="text-xs text-gray-400">完成</span>
                 </div>
               </div>
@@ -1251,7 +1263,7 @@ export default function PlanDetailPage() {
                   {[
                     {
                       label: '任务进度',
-                      value: `${localPlan.metrics.completedTasks}/${localPlan.metrics.totalTasks}`,
+                      value: `${plan.metrics?.completedTasks || 0}/${plan.metrics?.totalTasks || 0}`,
                       icon: CheckCircle,
                       color: 'blue'
                     },
@@ -1448,7 +1460,7 @@ export default function PlanDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <PathsSection plan={localPlan} onUpdate={handlePlanUpdate} />
+              <PathsSection plan={plan} onUpdate={handlePlanUpdate} />
             </motion.div>
           )}
 
@@ -1460,7 +1472,7 @@ export default function PlanDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <VersionView plan={localPlan} />
+              <div className="text-center text-gray-400 py-8">版本管理功能开发中...</div>
             </motion.div>
           )}
 
@@ -1472,7 +1484,7 @@ export default function PlanDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <MembersSection plan={localPlan} onUpdate={handlePlanUpdate} />
+              <MembersSection plan={plan} onUpdate={handlePlanUpdate} />
             </motion.div>
           )}
 
@@ -1484,7 +1496,7 @@ export default function PlanDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <ApprovalSection plan={localPlan} onUpdate={handlePlanUpdate} />
+              <ApprovalSection plan={plan} onUpdate={handlePlanUpdate} />
             </motion.div>
           )}
 
@@ -1496,7 +1508,7 @@ export default function PlanDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <ActivitySection plan={localPlan} />
+              <div className="text-center text-gray-400 py-8">活动记录功能开发中...</div>
             </motion.div>
           )}
 
@@ -1508,7 +1520,7 @@ export default function PlanDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <PlanStatsDashboard plans={[localPlan]} className="max-w-none" />
+              <div className="text-center text-gray-400 py-8">统计面板功能开发中...</div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1518,7 +1530,7 @@ export default function PlanDetailPage() {
       <ShareModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
-        plan={localPlan!}
+        plan={plan}
       />
     </div>
   );

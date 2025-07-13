@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/stores/useToastStore';
-import { usePlanStore } from '@/lib/stores/usePlanStore';
-import type { Plan, PlanMember } from '@/lib/mock-plans';
+import { useAuth } from '@/hooks/useAuth';
+import { createPlan, createPlanPath, createMilestone, addPlanMember } from '@/lib/supabase/database';
 
 interface Milestone {
   id: string;
@@ -944,7 +944,7 @@ PreviewStep.displayName = "PreviewStep";
 
 export default function CreatePlanPage() {
   const router = useRouter();
-  const addPlan = usePlanStore(state => state.addPlan);
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>('basic');
   const [isScrolled, setIsScrolled] = useState(false);
   const [formData, setFormData] = useState<PlanForm>({
@@ -981,94 +981,87 @@ export default function CreatePlanPage() {
     setIsScrolled(scrollTop > 20);
   };
 
-  const handleSubmit = useCallback(() => {
-    const now = new Date();
-    const creator: PlanMember = {
-      id: 'user-current',
-      name: '我',
-      avatar: 'https://i.pravatar.cc/150?u=user-current',
-      role: 'creator',
-      joinedAt: now,
-    };
+  const handleSubmit = useCallback(async () => {
+    if (!user) {
+      toast.error('请先登录', '需要登录才能创建计划');
+      router.push('/auth/login');
+      return;
+    }
 
-    const newMembers: PlanMember[] = [
-      creator,
-      ...formData.teamEmails.map((email, index) => ({
-        id: `user-${index + 1}`,
-        name: extractUsernameFromEmail(email),
-        avatar: `https://i.pravatar.cc/150?u=${email}`,
-        role: 'collaborator' as const,
-        joinedAt: now,
-      })),
-    ];
-
-    const newPlan: Plan = {
-      id: generateId(),
-      status: 'draft',
-      title: formData.title,
-      description: formData.description,
-      coverImage: formData.coverImage || `https://picsum.photos/seed/${generateId()}/1600/900`,
-      category: formData.category as Plan['category'],
-      priority: formData.priority,
-      createdAt: now,
-      updatedAt: now,
-      startDate: new Date(formData.startDate),
-      targetDate: new Date(formData.targetDate),
-      progress: 0,
-      creator: creator,
-      members: newMembers,
-      approvals: [],
-      currentVersion: {
-        id: 'v1',
-        version: '1.0',
+    try {
+      // 创建计划
+      const planData = {
+        creator_id: user.id,
         title: formData.title,
         description: formData.description,
-        createdAt: now,
-        createdBy: creator.name,
-        status: 'active',
-      },
-      versions: [],
-      paths: formData.executionPaths.map(path => ({
-        ...path,
-        startDate: new Date(path.startDate),
-        endDate: new Date(path.endDate),
-        status: 'planning' as const,
+        cover_image: formData.coverImage || `https://picsum.photos/seed/${generateId()}/1600/900`,
+        category: formData.category,
+        priority: formData.priority,
+        status: 'draft' as const,
         progress: 0,
-        milestones: path.milestones.map(m => ({ 
-          ...m, 
-          date: new Date(m.date),
-          ...(m.notes && { notes: m.notes })
-        })),
-      })),
-      tags: formData.tags,
-      metrics: {
-        totalTasks: formData.executionPaths.reduce((acc, path) => acc + path.milestones.length, 0),
-        completedTasks: 0,
-        totalBudget: formData.totalBudget,
-        spentBudget: 0,
-      },
-      activities: [{
-        id: generateId(),
-        type: 'creation',
-        description: '创建了该计划',
-        timestamp: now,
-        actor: { 
-          name: creator.name,
-          avatar: creator.avatar
-        },
-      }],
-    };
-    
-    // 添加到全局状态
-    addPlan(newPlan);
-    
-    console.log('New plan created:', newPlan);
-    toast.success(
-      '计划已创建',
-      `新计划 "${newPlan.title}" 已成功创建为草稿。`
-    );
-    router.push(`/plans/${newPlan.id}`);
-  }, [formData, router, addPlan]);
+        start_date: formData.startDate || null,
+        target_date: formData.targetDate || null,
+        tags: formData.tags,
+        metrics: {
+          totalBudget: formData.totalBudget,
+          spentBudget: 0,
+          totalTasks: formData.executionPaths.reduce((acc, path) => acc + path.milestones.length, 0),
+          completedTasks: 0
+        }
+      };
+
+      console.log('创建计划:', planData);
+      const newPlan = await createPlan(planData);
+      console.log('计划已创建:', newPlan);
+
+      // 创建执行路径和里程碑
+      for (const path of formData.executionPaths) {
+        const pathData = {
+          plan_id: newPlan.id,
+          title: path.title,
+          description: path.description,
+          status: 'planning' as const,
+          progress: 0,
+          start_date: path.startDate || null,
+          end_date: path.endDate || null,
+          display_order: formData.executionPaths.indexOf(path)
+        };
+
+        console.log('创建路径:', pathData);
+        const newPath = await createPlanPath(pathData);
+        console.log('路径已创建:', newPath);
+
+        // 创建里程碑
+        for (const milestone of path.milestones) {
+          const milestoneData = {
+            path_id: newPath.id,
+            title: milestone.title,
+            description: milestone.notes || null,
+            date: milestone.date || null,
+            completed: milestone.completed,
+            display_order: path.milestones.indexOf(milestone)
+          };
+
+          console.log('创建里程碑:', milestoneData);
+          await createMilestone(milestoneData);
+        }
+      }
+
+      // TODO: 邀请团队成员
+      // for (const email of formData.teamEmails) {
+      //   // 根据邮箱查找用户并添加为成员
+      // }
+
+      toast.success(
+        '计划已创建',
+        `新计划 "${newPlan.title}" 已成功创建为草稿。`
+      );
+      router.push(`/plans/${newPlan.id}`);
+    } catch (error) {
+      console.error('创建计划失败:', error);
+      toast.error('创建失败', '请稍后重试');
+    }
+  }, [formData, router, user]);
 
   const nextStep = useCallback(() => {
     const steps: Step[] = ['basic', 'paths', 'preview'];

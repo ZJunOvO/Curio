@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import { Plus, Search, Clock, Zap, LayoutGrid, GitBranch, Trello, LogIn } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { getUserPlans, type Plan } from '@/lib/supabase/database';
+import { getUserPlans, testDatabaseConnection, type Plan } from '@/lib/supabase/database';
 import { toast } from '@/lib/stores/useToastStore';
 
 const getPriorityIcon = (priority: string) => {
@@ -77,15 +77,35 @@ export default function PlansPage() {
   }, [user, authLoading]);
 
   const loadPlans = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('❌ 用户未登录，无法加载计划');
+      return;
+    }
+    
+    console.log('🔄 开始加载计划数据, 用户ID:', user.id);
+    
+    // 首先测试数据库连接
+    const testResult = await testDatabaseConnection();
+    console.log('🔍 数据库测试结果:', testResult);
     
     try {
       setLoading(true);
       const userPlans = await getUserPlans(user.id);
-      setPlans(userPlans);
+      console.log('✅ 计划加载成功:', userPlans?.length || 0, '个计划');
+      setPlans(userPlans || []);
+      
+      if (!userPlans || userPlans.length === 0) {
+        console.log('💭 没有找到计划数据，但无错误（正常情况）');
+      }
     } catch (error) {
-      console.error('Error loading plans:', error);
-      toast.error('加载失败', '无法加载计划数据');
+      console.error('❌ 加载计划失败:', error);
+      console.error('❌ 错误详情:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      toast.error('加载失败', `无法加载计划数据: ${error.message || '未知错误'}`);
     } finally {
       setLoading(false);
     }

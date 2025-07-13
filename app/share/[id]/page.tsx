@@ -9,23 +9,25 @@ import {
   Share2, ExternalLink, Shield
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type Plan, mockPlans } from '@/lib/mock-plans';
+import { getPlanDetails } from '@/lib/supabase/database';
 
-// 模拟从分享ID获取计划数据的函数
-const getPlanByShareId = async (shareId: string): Promise<Plan | null> => {
-  // 模拟API调用延迟
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // 从shareId中提取计划ID（格式：planId-timestamp）
-  const planId = shareId.split('-')[0];
-  const plan = mockPlans.find(p => p.id === planId);
-  
-  return plan || null;
+// 从分享ID获取计划数据的函数
+const getPlanByShareId = async (shareId: string) => {
+  try {
+    // 从shareId中提取计划ID（格式：planId-timestamp）
+    const planId = shareId.split('-')[0];
+    const plan = await getPlanDetails(planId);
+    
+    return plan;
+  } catch (error) {
+    console.error('Error fetching shared plan:', error);
+    return null;
+  }
 };
 
 export default function SharePlanPage() {
   const params = useParams();
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const [plan, setPlan] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

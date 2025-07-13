@@ -470,24 +470,69 @@ export interface Milestone {
   updated_at: string
 }
 
-// 获取用户参与的所有计划
+// 获取用户参与的所有计划 - 简化版本，RLS策略处理权限
 export async function getUserPlans(userId: string) {
+  console.log('🔍 开始查询用户计划, userId:', userId);
+  
+  // 使用简单查询，RLS策略会自动过滤用户可访问的计划
   const { data, error } = await supabase
     .from('plans')
     .select(`
       *,
-      plan_members!inner(user_id, role),
-      creator:user_profiles!plans_creator_id_fkey(id, username, avatar_url)
+      plan_members(user_id, role, user:user_profiles(username, avatar_url))
     `)
-    .eq('plan_members.user_id', userId)
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('Error fetching user plans:', error)
+    console.error('❌ 查询计划失败:', error)
     throw error
   }
 
-  return data
+  console.log('✅ 查询成功，找到', data?.length || 0, '个计划');
+  
+  return data || [];
+}
+
+// 测试数据库连接和认证
+export async function testDatabaseConnection() {
+  console.log('🔍 测试数据库连接...');
+  
+  try {
+    // 测试基本连接
+    const { data: testData, error: testError } = await supabase
+      .from('user_profiles')
+      .select('count')
+      .limit(1);
+    
+    if (testError) {
+      console.error('❌ 数据库连接失败:', testError);
+      return { success: false, error: testError };
+    }
+    
+    console.log('✅ 数据库连接正常');
+    
+    // 测试认证状态
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('👤 当前用户:', user ? `${user.email} (${user.id})` : '未登录');
+    
+    // 测试plans表基本查询
+    const { data: plansData, error: plansError } = await supabase
+      .from('plans')
+      .select('id, title, creator_id')
+      .limit(5);
+      
+    if (plansError) {
+      console.error('❌ plans表查询失败:', plansError);
+      return { success: false, error: plansError };
+    }
+    
+    console.log('📊 plans表查询成功，数据量:', plansData?.length || 0);
+    
+    return { success: true, user, plansCount: plansData?.length || 0 };
+  } catch (error) {
+    console.error('❌ 测试失败:', error);
+    return { success: false, error };
+  }
 }
 
 // 创建新计划
