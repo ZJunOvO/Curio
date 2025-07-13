@@ -6,11 +6,13 @@ import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { toast } from '@/lib/stores/useToastStore'
+import { useAuth } from '@/hooks/useAuth'
 
 type Step = 'image' | 'title' | 'details' | 'preview'
 
 export default function AddWishPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [currentStep, setCurrentStep] = useState<Step>('image')
   const [formData, setFormData] = useState({
     imageUrl: '',
@@ -37,11 +39,37 @@ export default function AddWishPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [currentStep, router])
 
-  const handleSubmit = () => {
-    // TODO: P-26 - 调用API创建新心愿
-    console.log('提交心愿:', formData)
-    toast.success('心愿创建成功', '它现在已经出现在你的心愿清单里了。')
-    router.push('/')
+  const handleSubmit = async () => {
+    if (!user) {
+      toast.error('请先登录', '需要登录才能创建心愿')
+      router.push('/auth/login')
+      return
+    }
+
+    try {
+      const { createWish } = await import('@/lib/supabase/database')
+      
+      const wishData = {
+        user_id: user.id,
+        title: formData.title,
+        description: formData.description,
+        image_url: formData.imageUrl,
+        category: formData.category,
+        tags: formData.tags || [],
+        priority: formData.priority as 'low' | 'medium' | 'high',
+        is_favorite: false
+      }
+
+      console.log('创建心愿:', wishData)
+      
+      await createWish(wishData)
+      
+      toast.success('心愿创建成功', '它现在已经出现在你的心愿清单里了。')
+      router.push('/')
+    } catch (error) {
+      console.error('创建心愿失败:', error)
+      toast.error('创建失败', '请稍后重试')
+    }
   }
 
   // 步骤导航

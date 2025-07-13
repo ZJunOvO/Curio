@@ -180,6 +180,7 @@ export async function getUserWishes(userId: string) {
   const { data, error } = await supabase
     .from('wishes')
     .select('*')
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -187,7 +188,7 @@ export async function getUserWishes(userId: string) {
     throw error
   }
 
-  return data
+  return data || []
 }
 
 // 创建心愿
