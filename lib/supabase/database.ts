@@ -470,17 +470,15 @@ export interface Milestone {
   updated_at: string
 }
 
-// 获取用户参与的所有计划 - 简化版本，RLS策略处理权限
+// 获取用户参与的所有计划 - 最简化版本，避免复杂JOIN
 export async function getUserPlans(userId: string) {
   console.log('🔍 开始查询用户计划, userId:', userId);
   
-  // 使用简单查询，RLS策略会自动过滤用户可访问的计划
+  // 只查询用户创建的计划，避免复杂的RLS查询
   const { data, error } = await supabase
     .from('plans')
-    .select(`
-      *,
-      plan_members(user_id, role, user:user_profiles(username, avatar_url))
-    `)
+    .select('*')
+    .eq('creator_id', userId)
     .order('created_at', { ascending: false })
 
   if (error) {
