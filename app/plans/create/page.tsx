@@ -254,7 +254,12 @@ const BasicInfoStep = React.memo(({ onFormChange, nextStep, onScroll, isHeaderVi
                   placeholder="添加标签..."
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && e.preventDefault() && addTag()}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
                   className="flex-1 bg-gray-800 p-3 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-white/20 border border-transparent"
                   aria-label="输入新标签"
                 />

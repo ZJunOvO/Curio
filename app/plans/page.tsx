@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { usePlanStore } from '@/lib/stores/usePlanStore';
-import type { Plan } from '@/lib/mock-plans';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
-import { Plus, Search, Check, X, Clock, ChevronRight, Zap, LayoutGrid, GitBranch, Trello } from 'lucide-react';
+import { Plus, Search, Clock, Zap, LayoutGrid, GitBranch, Trello, LogIn } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { getUserPlans, type Plan } from '@/lib/supabase/database';
+import { toast } from '@/lib/stores/useToastStore';
 
 const getPriorityIcon = (priority: string) => {
   if (priority === 'high') return <Zap className="w-4 h-4 text-red-400" />;
@@ -15,26 +16,29 @@ const getPriorityIcon = (priority: string) => {
 };
 
 const getDueDateStatus = (targetDate: string) => {
-    const now = new Date();
-    const target = new Date(targetDate);
-    const diffTime = target.getTime() - now.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const now = new Date();
+  const target = new Date(targetDate);
+  const diffTime = target.getTime() - now.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) {
-        return <span className="text-red-400">已过期</span>;
-    }
-    if (diffDays <= 7) {
-        return <span className="text-yellow-400">{`还有 ${diffDays} 天`}</span>;
-    }
-    return <span className="text-gray-400">{`还有 ${diffDays} 天`}</span>;
+  if (diffDays < 0) {
+    return <span className="text-red-400">已过期</span>;
+  }
+  if (diffDays <= 7) {
+    return <span className="text-yellow-400">{`还有 ${diffDays} 天`}</span>;
+  }
+  return <span className="text-gray-400">{`还有 ${diffDays} 天`}</span>;
 };
 
 export default function PlansPage() {
-  const { plans, initializePlans } = usePlanStore();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'kanban'>('grid');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [mounted, setMounted] = useState(false);
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
 
   const { scrollY } = useScroll();
@@ -45,14 +49,12 @@ export default function PlansPage() {
     const currentScrollY = latest;
     const previousScrollY = lastScrollY.current;
     
-    // 确定滚动方向
     if (currentScrollY > previousScrollY) {
       scrollDirection.current = 'down';
     } else if (currentScrollY < previousScrollY) {
       scrollDirection.current = 'up';
     }
     
-    // 使用更大的阈值差异和方向检查来防止抖动
     const SHOW_THRESHOLD = 60;
     const HIDE_THRESHOLD = 200;
     
@@ -65,11 +67,29 @@ export default function PlansPage() {
     lastScrollY.current = currentScrollY;
   });
 
+  // 加载计划数据
   useEffect(() => {
-    // 初始化计划数据
-    initializePlans();
-    setMounted(true);
-  }, [initializePlans]);
+    if (user) {
+      loadPlans();
+    } else if (!authLoading) {
+      setLoading(false);
+    }
+  }, [user, authLoading]);
+
+  const loadPlans = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      const userPlans = await getUserPlans(user.id);
+      setPlans(userPlans);
+    } catch (error) {
+      console.error('Error loading plans:', error);
+      toast.error('加载失败', '无法加载计划数据');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredPlans = useMemo(() => {
     return plans
@@ -78,7 +98,7 @@ export default function PlansPage() {
   }, [plans, filterStatus, searchQuery]);
 
   const kanbanGroups = useMemo(() => {
-    const groups: { [key: string]: Plan[] } = {
+    const groups: { [key: string]: any[] } = {
       draft: [],
       review: [],
       active: [],
@@ -91,6 +111,52 @@ export default function PlansPage() {
     });
     return groups;
   }, [filteredPlans]);
+
+  // 如果未认证，显示登录提示
+  if (!authLoading && !user) {
+    return (
+      <div className="bg-black min-h-screen text-white flex items-center justify-center p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-r from-blue-500 to-purple-500 rounded-3xl flex items-center justify-center">
+            <LayoutGrid size={40} className="text-white" />
+          </div>
+          <h1 className="text-4xl font-bold text-white mb-4">计划管理</h1>
+          <p className="text-gray-400 mb-8 text-lg">
+            登录后管理你的梦想蓝图
+          </p>
+          <div className="space-y-4">
+            <button
+              onClick={() => router.push('/auth/login')}
+              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-2xl text-white font-semibold transition-all duration-300 hover:scale-105"
+            >
+              <LogIn size={20} />
+              登录账户
+            </button>
+            <button
+              onClick={() => router.push('/auth/register')}
+              className="w-full px-6 py-4 bg-white/10 hover:bg-white/20 rounded-2xl text-white font-semibold transition-all duration-300 backdrop-blur-2xl border border-white/20"
+            >
+              创建新账户
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // 加载状态
+  if (loading || authLoading) {
+    return (
+      <div className="bg-black min-h-screen text-white flex items-center justify-center">
+        <div className="text-xl">加载中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-black min-h-screen text-white">
@@ -160,8 +226,7 @@ export default function PlansPage() {
                 onClick={() => setFilterStatus(status)}
                 className={cn(
                   "px-3 py-1 rounded-full text-sm transition-all duration-300 flex-shrink-0",
-                  filterStatus === status ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5",
-                  mounted ? "opacity-100" : "opacity-0"
+                  filterStatus === status ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
                 )}
               >
                 {status === 'all' ? '全部' : 
@@ -175,73 +240,94 @@ export default function PlansPage() {
       </div>
 
       <main className="container mx-auto px-6 py-8">
-        <AnimatePresence mode="wait">
-          {viewMode === 'grid' && (
-            <motion.div
-              key="grid"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-              {filteredPlans.map((plan, index) => (
-                <PlanCard key={plan.id} plan={plan} index={index} viewMode="grid" />
-              ))}
-            </motion.div>
-          )}
-
-          {viewMode === 'timeline' && (
-            <motion.div
-              key="timeline"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="relative px-4 sm:px-0"
-            >
-              <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
-              
-              <div className="space-y-12">
+        {filteredPlans.length === 0 ? (
+          <div className="flex items-center justify-center min-h-[60vh] text-center">
+            <div className="max-w-md">
+              <LayoutGrid size={80} className="mx-auto mb-6 text-white/30" />
+              <h3 className="text-2xl font-bold text-white mb-4">
+                {filterStatus === 'all' ? '还没有计划' : `还没有${filterStatus === 'draft' ? '草稿' : filterStatus === 'review' ? '审核中' : filterStatus === 'active' ? '进行中' : '已完成'}的计划`}
+              </h3>
+              <p className="text-gray-400 mb-8">
+                创建你的第一个计划，开始管理梦想蓝图
+              </p>
+              <a
+                href="/plans/create"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl text-white font-semibold hover:from-blue-600 hover:to-purple-600 transition-all"
+              >
+                <Plus size={20} />
+                创建计划
+              </a>
+            </div>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            {viewMode === 'grid' && (
+              <motion.div
+                key="grid"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+              >
                 {filteredPlans.map((plan, index) => (
-                  <PlanCard key={plan.id} plan={plan} index={index} viewMode="timeline" />
+                  <PlanCard key={plan.id} plan={plan} index={index} viewMode="grid" />
                 ))}
-              </div>
-            </motion.div>
-          )}
-          
-          {viewMode === 'kanban' && (
-            <motion.div
-              key="kanban"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex gap-6 overflow-x-auto pb-4 md:grid md:grid-cols-2 lg:grid-cols-4 md:overflow-x-visible -mx-6 px-6"
-            >
-              {Object.entries(kanbanGroups).map(([status, groupPlans]) => (
-                <div key={status} className="min-w-[18rem] space-y-4 md:min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold capitalize">
-                      {status === 'draft' ? '草稿' : 
-                       status === 'review' ? '审核中' :
-                       status === 'active' ? '进行中' : '已完成'}
-                    </h3>
-                    <span className="text-sm text-gray-400 bg-white/5 px-2 py-0.5 rounded-full">{groupPlans.length}</span>
-                  </div>
-                  <div className="space-y-4">
-                    {groupPlans.map((plan, index) => (
-                      <PlanCard key={plan.id} plan={plan} index={index} viewMode="kanban" />
-                    ))}
-                  </div>
+              </motion.div>
+            )}
+
+            {viewMode === 'timeline' && (
+              <motion.div
+                key="timeline"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="relative px-4 sm:px-0"
+              >
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
+                
+                <div className="space-y-12">
+                  {filteredPlans.map((plan, index) => (
+                    <PlanCard key={plan.id} plan={plan} index={index} viewMode="timeline" />
+                  ))}
                 </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            )}
+            
+            {viewMode === 'kanban' && (
+              <motion.div
+                key="kanban"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex gap-6 overflow-x-auto pb-4 md:grid md:grid-cols-2 lg:grid-cols-4 md:overflow-x-visible -mx-6 px-6"
+              >
+                {Object.entries(kanbanGroups).map(([status, groupPlans]) => (
+                  <div key={status} className="min-w-[18rem] space-y-4 md:min-w-0">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold capitalize">
+                        {status === 'draft' ? '草稿' : 
+                         status === 'review' ? '审核中' :
+                         status === 'active' ? '进行中' : '已完成'}
+                      </h3>
+                      <span className="text-sm text-gray-400 bg-white/5 px-2 py-0.5 rounded-full">{groupPlans.length}</span>
+                    </div>
+                    <div className="space-y-4">
+                      {groupPlans.map((plan, index) => (
+                        <PlanCard key={plan.id} plan={plan} index={index} viewMode="kanban" />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        )}
       </main>
     </div>
   );
 }
 
-const PlanCard: React.FC<{ plan: Plan; index: number; viewMode: 'grid' | 'timeline' | 'kanban' }> = ({ plan, index, viewMode }) => {
+const PlanCard: React.FC<{ plan: any; index: number; viewMode: 'grid' | 'timeline' | 'kanban' }> = ({ plan, index, viewMode }) => {
   const router = useRouter();
   const [showDescription, setShowDescription] = useState(false);
 
@@ -289,11 +375,11 @@ const PlanCard: React.FC<{ plan: Plan; index: number; viewMode: 'grid' | 'timeli
             <h3 className="font-semibold line-clamp-1">{plan.title}</h3>
           </div>
           <div className="flex -space-x-2">
-            {plan.members.slice(0, 2).map((member) => (
+            {plan.plan_members?.slice(0, 2).map((member: any) => (
               <img
-                key={member.id}
-                src={member.avatar}
-                alt={member.name}
+                key={member.user_id}
+                src={member.user?.avatar_url || `https://ui-avatars.com/api/?name=${member.user?.username || 'User'}&background=6366f1&color=fff`}
+                alt={member.user?.username || 'User'}
                 className="w-6 h-6 rounded-full border-2 border-black"
                 width={24}
                 height={24}
@@ -304,7 +390,9 @@ const PlanCard: React.FC<{ plan: Plan; index: number; viewMode: 'grid' | 'timeli
         <p className="text-sm text-gray-400 line-clamp-2 mb-3">{plan.description}</p>
         <div className="flex items-center justify-between text-xs text-gray-400">
           <span>{plan.progress}% 完成</span>
-          <span>{getDueDateStatus(plan.targetDate.toISOString())}</span>
+          {plan.target_date && (
+            <span>{getDueDateStatus(plan.target_date)}</span>
+          )}
         </div>
       </motion.div>
     );
@@ -320,7 +408,7 @@ const PlanCard: React.FC<{ plan: Plan; index: number; viewMode: 'grid' | 'timeli
       onClick={() => router.push(`/plans/${plan.id}`)}
     >
       <img
-        src={plan.coverImage}
+        src={plan.cover_image || `https://images.unsplash.com/photo-1611224923853-80b023f02d71?w=800&h=600&fit=crop&crop=entropy&auto=format&q=60`}
         alt={plan.title}
         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
       />
@@ -345,20 +433,20 @@ const PlanCard: React.FC<{ plan: Plan; index: number; viewMode: 'grid' | 'timeli
             <p className="text-sm text-gray-300 mt-1 line-clamp-1">{plan.category}</p>
           </div>
           <div className="flex -space-x-3">
-            {plan.members.slice(0, 3).map((member, idx) => (
+            {plan.plan_members?.slice(0, 3).map((member: any, idx: number) => (
               <img
-                key={member.id}
-                src={member.avatar}
-                alt={member.name}
+                key={member.user_id}
+                src={member.user?.avatar_url || `https://ui-avatars.com/api/?name=${member.user?.username || 'User'}&background=6366f1&color=fff`}
+                alt={member.user?.username || 'User'}
                 className="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-black"
                 width={40}
                 height={40}
                 style={{ zIndex: 3 - idx }}
               />
             ))}
-            {plan.members.length > 3 && (
+            {plan.plan_members && plan.plan_members.length > 3 && (
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-xs text-white border-2 border-black" style={{ zIndex: 0 }}>
-                +{plan.members.length - 3}
+                +{plan.plan_members.length - 3}
               </div>
             )}
           </div>

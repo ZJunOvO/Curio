@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Plus, Heart, Layers3, Calendar, X, Grid3X3, Eye } from 'lucide-react';
+import { Plus, Heart, Layers3, Calendar, X, Users, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { useUIStore } from '@/lib/stores/useUIStore';
@@ -14,10 +14,8 @@ export function FloatingNav() {
   
   // 使用全局UI状态
   const { 
-    viewMode,
     showFavorites, 
     isNavExpanded,
-    setViewMode,
     toggleShowFavorites,
     setIsNavExpanded
   } = useUIStore();
@@ -129,35 +127,29 @@ export function FloatingNav() {
               >
                 <Calendar size={18} />
               </button>
+              <button
+                onClick={() => router.push('/together')}
+                className={cn(
+                  'p-2.5 rounded-xl transition-all duration-300',
+                  'hover:scale-105 active:scale-95',
+                  pathname.startsWith('/together') ? 'bg-white text-black' : 'text-white hover:bg-white/10'
+                )}
+                aria-label="打开Together页面"
+              >
+                <Users size={18} />
+              </button>
+              <button
+                onClick={() => router.push('/profile')}
+                className={cn(
+                  'p-2.5 rounded-xl transition-all duration-300',
+                  'hover:scale-105 active:scale-95',
+                  pathname.startsWith('/profile') ? 'bg-white text-black' : 'text-white hover:bg-white/10'
+                )}
+                aria-label="打开个人中心"
+              >
+                <User size={18} />
+              </button>
             </div>
-
-            {/* 中间：主页视图切换按钮 */}
-            {isHomePage && (
-              <div className="flex gap-1 bg-white/5 rounded-lg p-1">
-                <button
-                  onClick={() => setViewMode('flow')}
-                  className={cn(
-                    'p-2 rounded-lg transition-all duration-300',
-                    'hover:scale-105 active:scale-95',
-                    viewMode === 'flow' ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'
-                  )}
-                  aria-label="流动视图"
-                >
-                  <Eye size={16} />
-                </button>
-                <button
-                  onClick={() => setViewMode('minimal')}
-                  className={cn(
-                    'p-2 rounded-lg transition-all duration-300',
-                    'hover:scale-105 active:scale-95',
-                    viewMode === 'minimal' ? 'bg-white/20 text-white' : 'text-white/60 hover:text-white'
-                  )}
-                  aria-label="极简视图"
-                >
-                  <Grid3X3 size={16} />
-                </button>
-              </div>
-            )}
 
             {/* 右侧：操作按钮 */}
             <div className="flex gap-1">
@@ -204,14 +196,7 @@ export function FloatingNav() {
         </div>
       </div>
 
-      {/* 点击外部收起导航栏 */}
-      {isNavExpanded && (
-        <div 
-          className="fixed inset-0 z-30"
-          onClick={collapseNav}
-          aria-hidden="true"
-        />
-      )}
+      {/* 遮罩层已移除 - 用户可以通过关闭按钮来收起导航栏 */}
     </>
   );
 } 

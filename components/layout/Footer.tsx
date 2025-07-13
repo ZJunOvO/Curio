@@ -96,7 +96,7 @@ export const Footer: React.FC<FooterProps> = ({ className }) => {
                 </div>
               </div>
               <p className="text-apple-gray-600 dark:text-apple-gray-400 text-sm leading-6 mb-6">
-                成为用户管理个人欲望、探索内在品味的"第二大脑"，通过极致优雅的工具体验，将零散的灵感转化为可被感知的、成体系的个人风格。
+                成为用户管理个人欲望、探索内在品味的&ldquo;第二大脑&rdquo;，通过极致优雅的工具体验，将零散的灵感转化为可被感知的、成体系的个人风格。
               </p>
               
               {/* 社交链接 */}

@@ -8,13 +8,14 @@ import {
   CheckCircle, XCircle, MessageCircle, AlertCircle,
   GitBranch, History, UserPlus, MoreVertical,
   Eye, Edit, Trash, ChevronRight, Sparkles,
-  Shield, Crown, Zap, Plus, Trash2, BookOpen
+  Shield, Crown, Zap, Plus, Trash2, BookOpen, Share2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePlanStore } from '@/lib/stores/usePlanStore';
 import { type Plan, type PlanApproval, type PlanVersion, type PlanPath, type PlanActivity } from '@/lib/mock-plans';
 import { toast } from '@/lib/stores/useToastStore';
 import { PlanStatsDashboard } from '@/components/core/charts';
+import { ShareModal } from '@/components/core';
 
 const generateActivityId = () => `act-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -575,12 +576,20 @@ const PathsSection: React.FC<{
   const generateId = () => Math.random().toString(36).substr(2, 9);
 
   // --- Helper to recalculate plan status ---
-  const recalculatePlanStatus = (paths: PlanPath[]): { status: Plan['status'], progress: number } => {
+  const recalculatePlanStatus = (paths: PlanPath[]): { status: Plan['status'], progress: number, metrics: Plan['metrics'] } => {
     // 改进：基于所有里程碑的完成情况来计算进度，而不仅仅是路径状态
     const totalMilestones = paths.reduce((total, path) => total + path.milestones.length, 0);
     
     if (totalMilestones === 0) {
-      return { status: plan.status, progress: 0 };
+      return { 
+        status: plan.status, 
+        progress: 0,
+        metrics: {
+          ...plan.metrics,
+          totalTasks: 0,
+          completedTasks: 0
+        }
+      };
     }
     
     const completedMilestones = paths.reduce((total, path) => 
@@ -598,7 +607,14 @@ const PathsSection: React.FC<{
       }
     }
     
-    return { status, progress };
+    // 更新 metrics
+    const updatedMetrics = {
+      ...plan.metrics,
+      totalTasks: totalMilestones,
+      completedTasks: completedMilestones
+    };
+    
+    return { status, progress, metrics: updatedMetrics };
   };
 
   // --- Path Logic ---
@@ -641,7 +657,7 @@ const PathsSection: React.FC<{
     if (!pathToDelete) return;
 
     const updatedPaths = plan.paths.filter(p => p.id !== pathId);
-    const { status: newPlanStatus, progress: newPlanProgress } = recalculatePlanStatus(updatedPaths);
+    const { status: newPlanStatus, progress: newPlanProgress, metrics: newMetrics } = recalculatePlanStatus(updatedPaths);
 
     const activity = createActivity('update', `删除了执行路径: "${pathToDelete.title}"`);
 
@@ -650,6 +666,7 @@ const PathsSection: React.FC<{
       paths: updatedPaths,
       status: newPlanStatus,
       progress: newPlanProgress,
+      metrics: newMetrics,
       activities: [...plan.activities, activity],
       updatedAt: new Date(),
     });
@@ -726,7 +743,7 @@ const PathsSection: React.FC<{
       newActivities.push(createActivity('milestone', `里程碑 "${milestoneTitle}" 标记为${milestoneCompleted ? '完成' : '未完成'}`));
     }
 
-    const { status: newPlanStatus, progress: newPlanProgress } = recalculatePlanStatus(updatedPaths);
+    const { status: newPlanStatus, progress: newPlanProgress, metrics: newMetrics } = recalculatePlanStatus(updatedPaths);
     
     if (plan.status !== newPlanStatus) {
         newActivities.push(createActivity('status_change', `计划状态更新为: ${newPlanStatus === 'completed' ? '已完成' : '进行中'}`));
@@ -737,6 +754,7 @@ const PathsSection: React.FC<{
       paths: updatedPaths,
       status: newPlanStatus,
       progress: newPlanProgress,
+      metrics: newMetrics,
       activities: [...plan.activities, ...newActivities],
       updatedAt: new Date(), // Update timestamp
     });
@@ -774,7 +792,7 @@ const PathsSection: React.FC<{
       return currentPath;
     });
 
-    const { status: newPlanStatus, progress: newPlanProgress } = recalculatePlanStatus(updatedPaths);
+    const { status: newPlanStatus, progress: newPlanProgress, metrics: newMetrics } = recalculatePlanStatus(updatedPaths);
 
     const activity = createActivity('milestone', `删除了里程碑: "${milestone.title}"`);
 
@@ -783,6 +801,7 @@ const PathsSection: React.FC<{
       paths: updatedPaths,
       status: newPlanStatus,
       progress: newPlanProgress,
+      metrics: newMetrics,
       activities: [...plan.activities, activity],
       updatedAt: new Date(),
     });
@@ -1045,6 +1064,7 @@ export default function PlanDetailPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'paths' | 'versions' | 'members' | 'approvals' | 'activity' | 'stats'>('overview');
   const [localPlan, setLocalPlan] = useState<Plan | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => {
     // 确保数据已初始化
@@ -1090,8 +1110,8 @@ export default function PlanDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
         </div>
 
-        {/* 返回按钮 */}
-        <div className="absolute top-6 left-6 z-20">
+        {/* 返回按钮和操作按钮 */}
+        <div className="absolute top-6 left-6 right-6 z-20 flex items-center justify-between">
           <a
             href="/plans"
             className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-lg hover:bg-white/20 transition-colors"
@@ -1099,6 +1119,17 @@ export default function PlanDetailPage() {
             <ArrowLeft className="w-4 h-4" />
             返回
           </a>
+          
+          {/* 操作按钮组 */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 hover:bg-white/20 hover:border-white/30 transition-all duration-200 text-white shadow-lg"
+            >
+              <Share2 className="w-4 h-4" />
+              分享
+            </button>
+          </div>
         </div>
 
         {/* 标题信息 */}
@@ -1150,18 +1181,18 @@ export default function PlanDetailPage() {
                     strokeWidth="8"
                     fill="none"
                     strokeDasharray={`${2 * Math.PI * 56}`}
-                    strokeDashoffset={`${2 * Math.PI * 56 * (1 - plan.progress / 100)}`}
+                    strokeDashoffset={`${2 * Math.PI * 56 * (1 - localPlan.progress / 100)}`}
                     className={cn(
-                      plan.progress >= 80 ? 'text-green-500' :
-                      plan.progress >= 50 ? 'text-blue-500' :
-                      plan.progress >= 30 ? 'text-yellow-500' :
+                      localPlan.progress >= 80 ? 'text-green-500' :
+                      localPlan.progress >= 50 ? 'text-blue-500' :
+                      localPlan.progress >= 30 ? 'text-yellow-500' :
                       'text-gray-400',
                       "transition-all duration-1000"
                     )}
                   />
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-bold">{plan.progress}%</span>
+                  <span className="text-3xl font-bold">{localPlan.progress}%</span>
                   <span className="text-xs text-gray-400">完成</span>
                 </div>
               </div>
@@ -1220,7 +1251,7 @@ export default function PlanDetailPage() {
                   {[
                     {
                       label: '任务进度',
-                      value: `${plan.metrics.completedTasks}/${plan.metrics.totalTasks}`,
+                      value: `${localPlan.metrics.completedTasks}/${localPlan.metrics.totalTasks}`,
                       icon: CheckCircle,
                       color: 'blue'
                     },
@@ -1482,6 +1513,13 @@ export default function PlanDetailPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* 分享模态框 */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        plan={localPlan!}
+      />
     </div>
   );
 }

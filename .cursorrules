@@ -1,0 +1,198 @@
+# 品镜 (Curio) 项目开发规范
+
+## 项目概述
+品镜 (Curio) 是一个基于 Next.js + HeroUI 的心愿管理应用，严格遵循 Apple Design 设计原则。
+
+## 核心设计原则 🎨
+
+### Apple Design 指导原则
+- **极简主义**: 界面元素精简，避免视觉杂乱
+- **深度与层次**: 使用阴影、模糊效果创建空间感  
+- **清晰度**: 文字清晰易读，图标简洁明了
+- **一致性**: 交互模式、动画效果保持统一
+- **精致细节**: 圆角、间距、动画缓动函数精心设计
+- **可访问性**: 优先考虑所有用户的体验
+
+### 视觉设计规范
+- 主色调: Apple Blue (#007AFF)
+- 圆角: 10px (rounded-apple)
+- 阴影: 渐进式阴影系统 (apple-sm/apple/apple-lg)
+- 动画: 使用 Apple 签名缓动 cubic-bezier(0.16, 1, 0.3, 1)
+- 字体: SF Pro Display/Text font stack
+
+## 技术栈 & 架构 🛠️
+
+### 核心技术栈
+- **前端框架**: Next.js 14 (App Router)
+- **UI 库**: HeroUI v2.7.0 (NextUI 继任者)
+- **样式方案**: Tailwind CSS + 自定义 Apple Design tokens
+- **状态管理**: Zustand
+- **表单处理**: React Hook Form
+- **图标库**: lucide-react (简洁线条风格)
+- **动画库**: Framer Motion (内置于 HeroUI)
+
+### 项目结构
+```
+/app                    # Next.js App Router
+/components
+  /ui                   # 基础UI组件 (Button, Card, Input...)
+  /layout              # 布局组件 (Header, Sidebar, Footer)
+  /core                # 业务核心组件
+/lib                    # 工具函数与配置
+/styles                 # 全局样式
+/hooks                  # 自定义Hooks
+/types                  # TypeScript类型定义
+```
+
+## 代码质量规范 ✨
+
+### 组件开发规范
+1. **所有组件必须使用 TypeScript**
+2. **使用 forwardRef 支持 ref 传递**
+3. **组件 Props 接口命名**: `ComponentNameProps`
+4. **导出方式**: 命名导出 + 统一 index.ts 再导出
+5. **样式管理**: 使用 cn() 函数合并 className
+6. **错误处理**: 优雅降级，提供友好的错误边界
+
+### 命名约定
+- **组件名**: PascalCase (Button, CardHeader)
+- **文件名**: PascalCase (Button.tsx, Modal.tsx)
+- **Hook名**: camelCase, use开头 (useDisclosure)
+- **工具函数**: camelCase (formatFileSize, generateId)
+- **常量**: SCREAMING_SNAKE_CASE (API_BASE_URL)
+
+### 代码风格
+- **缩进**: 2空格
+- **引号**: 单引号
+- **分号**: 必须添加
+- **导入顺序**: React → 第三方库 → 内部组件 → 工具函数
+- **注释**: 对复杂逻辑添加清晰注释
+
+## 组件开发指南 🧩
+
+### 基础组件封装原则
+1. **基于 HeroUI 封装**, 不直接使用原生 HTML 元素
+2. **保持 API 一致性**, 统一的 Props 命名
+3. **支持主题定制**, 通过 className 覆盖样式
+4. **响应式优先**, 移动端体验不可妥协
+5. **无障碍访问**, 遵循 WAI-ARIA 标准
+
+### 样式开发规范
+- 优先使用 Tailwind 预定义类
+- 自定义样式通过 Tailwind theme 扩展
+- 使用 CSS 变量管理主题色彩
+- 避免内联样式，除非绝对必要
+- 动画使用 Apple 标准缓动函数
+
+### 状态管理
+- **组件内状态**: useState, useReducer
+- **表单状态**: React Hook Form
+- **全局状态**: Zustand stores
+- **服务端状态**: 待定 (TanStack Query 或 SWR)
+
+## 文件组织规范 📁
+
+### 组件文件结构
+```typescript
+// Button.tsx
+'use client'
+import React from 'react'
+import { ComponentProps } from '@heroui/react'
+import { cn } from '@/lib/utils'
+
+export interface ButtonProps extends ComponentProps {
+  // Props 定义
+}
+
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ ...props }, ref) => {
+    // 组件实现
+  }
+)
+
+Button.displayName = 'Button'
+```
+
+### 导出规范
+```typescript
+// components/ui/index.ts
+export * from './Button'
+export * from './Card'
+export { cn } from '@/lib/utils'
+```
+
+## 测试策略 🧪
+
+### 测试金字塔
+1. **单元测试**: 组件逻辑测试 (Vitest + React Testing Library)
+2. **集成测试**: 组件交互测试
+3. **E2E测试**: 关键用户流程 (Playwright)
+
+### 测试覆盖率要求
+- 组件逻辑: 80%+
+- 工具函数: 90%+
+- 关键业务流程: 100%
+
+## 性能优化 ⚡
+
+### 代码分割
+- 页面级懒加载
+- 组件级动态导入
+- 第三方库按需加载
+
+### 图片优化
+- 使用 next/image 组件
+- WebP 格式优先
+- 响应式图片策略
+
+## Git 工作流 🔄
+
+### 分支策略
+- `main`: 生产环境
+- `develop`: 开发环境
+- `feature/*`: 功能分支
+- `hotfix/*`: 紧急修复
+
+### 提交信息规范
+```
+feat: 新功能
+fix: Bug 修复  
+docs: 文档更新
+style: 样式调整
+refactor: 代码重构
+test: 测试相关
+chore: 构建/工具链
+```
+
+## 部署 & 环境 🚀
+
+### 环境配置
+- **开发**: localhost:3000
+- **预览**: Vercel Preview
+- **生产**: Vercel Production
+
+### 环境变量管理
+- `.env.local`: 本地开发
+- `.env.example`: 模板文件
+- Vercel 环境变量: 生产配置
+
+## 代码审查标准 👀
+
+### 必检项目
+1. Apple Design 原则遵循
+2. 组件 API 设计合理性
+3. 性能影响评估
+4. 可访问性检查
+5. 响应式适配验证
+6. TypeScript 类型安全
+
+### 审查流程
+1. 自测通过
+2. 组件展示页面更新
+3. PR 描述清晰
+4. 代码评审通过
+5. 合并到目标分支
+
+---
+
+**记住**: 品镜项目的每一个像素都要体现 Apple 的优雅与精致 ✨
