@@ -1,4 +1,4 @@
-import { Plan } from './mock-plans';
+// chart-utils使用any类型支持不同数据源
 
 // 颜色主题 - 遵循Apple Design原则
 export const chartColors = {
@@ -22,7 +22,7 @@ export interface StatusDistributionData {
   description: string;
 }
 
-export const getPlanStatusDistribution = (plans: Plan[]): StatusDistributionData[] => {
+export const getPlanStatusDistribution = (plans: any[]): StatusDistributionData[] => {
   const statusMap = new Map<string, number>();
   
   plans.forEach(plan => {
@@ -54,7 +54,7 @@ export interface CategoryDistributionData {
   name: string;
 }
 
-export const getPlanCategoryDistribution = (plans: Plan[]): CategoryDistributionData[] => {
+export const getPlanCategoryDistribution = (plans: any[]): CategoryDistributionData[] => {
   const categoryMap = new Map<string, number>();
   
   plans.forEach(plan => {
@@ -91,7 +91,7 @@ export interface PriorityDistributionData {
   name: string;
 }
 
-export const getPlanPriorityDistribution = (plans: Plan[]): PriorityDistributionData[] => {
+export const getPlanPriorityDistribution = (plans: any[]): PriorityDistributionData[] => {
   const priorityMap = new Map<string, number>();
   
   plans.forEach(plan => {
@@ -121,7 +121,7 @@ export interface ProgressData {
   color: string;
 }
 
-export const getPlanProgressData = (plans: Plan[]): ProgressData[] => {
+export const getPlanProgressData = (plans: any[]): ProgressData[] => {
   return plans.map(plan => ({
     name: plan.title.length > 15 ? plan.title.substring(0, 15) + '...' : plan.title,
     progress: plan.progress,
@@ -141,7 +141,7 @@ export interface BudgetData {
   utilizationRate: number;
 }
 
-export const getBudgetData = (plans: Plan[]): BudgetData[] => {
+export const getBudgetData = (plans: any[]): BudgetData[] => {
   return plans
     .filter(plan => plan.metrics.totalBudget && plan.metrics.totalBudget > 0)
     .map(plan => {
@@ -168,7 +168,7 @@ export interface TaskData {
   completionRate: number;
 }
 
-export const getOverallTaskData = (plans: Plan[]): TaskData => {
+export const getOverallTaskData = (plans: any[]): TaskData => {
   const totalTasks = plans.reduce((sum, plan) => sum + plan.metrics.totalTasks, 0);
   const completedTasks = plans.reduce((sum, plan) => sum + plan.metrics.completedTasks, 0);
   const remainingTasks = totalTasks - completedTasks;
@@ -189,7 +189,7 @@ export interface MonthlyTrendData {
   color: string;
 }
 
-export const getMonthlyCreationTrend = (plans: Plan[]): MonthlyTrendData[] => {
+export const getMonthlyCreationTrend = (plans: any[]): MonthlyTrendData[] => {
   const monthMap = new Map<string, number>();
   
   plans.forEach(plan => {
@@ -216,7 +216,7 @@ export interface MemberParticipationData {
   color: string;
 }
 
-export const getMemberParticipation = (plans: Plan[]): MemberParticipationData[] => {
+export const getMemberParticipation = (plans: any[]): MemberParticipationData[] => {
   const memberMap = new Map<string, { count: number; roles: Set<string> }>();
   
   plans.forEach(plan => {
@@ -250,7 +250,7 @@ export interface PlanHealthData {
   };
 }
 
-export const getPlanHealthData = (plans: Plan[]): PlanHealthData[] => {
+export const getPlanHealthData = (plans: any[]): PlanHealthData[] => {
   return plans.map(plan => {
     const now = new Date();
     const totalDuration = plan.targetDate.getTime() - plan.startDate.getTime();

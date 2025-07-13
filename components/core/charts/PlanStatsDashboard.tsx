@@ -12,7 +12,7 @@ import {
   DollarSign,
   Activity
 } from 'lucide-react';
-import { Plan } from '@/lib/mock-plans';
+// 使用any类型，因为组件应该独立于具体数据类型
 import {
   getPlanStatusDistribution,
   getPlanCategoryDistribution,
@@ -29,7 +29,7 @@ import CategoryBarChart from './CategoryBarChart';
 import ProgressLineChart from './ProgressLineChart';
 
 export interface PlanStatsDashboardProps {
-  plans: Plan[];
+  plans: any[]; // 使用any类型支持Supabase数据格式
   className?: string;
 }
 

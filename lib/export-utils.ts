@@ -1,10 +1,10 @@
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
-import { type Plan } from './mock-plans';
+// export-utils使用any类型支持不同数据源
 
 // 创建计划的HTML内容用于导出
-export const createPlanExportHTML = (plan: Plan, shareUrl?: string): string => {
+export const createPlanExportHTML = (plan: any, shareUrl?: string): string => {
   const completedTasks = plan.metrics.completedTasks;
   const totalTasks = plan.metrics.totalTasks;
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
@@ -432,7 +432,7 @@ export const generateQRCode = async (text: string): Promise<string> => {
 };
 
 // 导出为PDF
-export const exportToPDF = async (plan: Plan, shareUrl?: string): Promise<void> => {
+export const exportToPDF = async (plan: any, shareUrl?: string): Promise<void> => {
   try {
     // 创建临时容器
     const tempContainer = document.createElement('div');
@@ -498,7 +498,7 @@ export const exportToPDF = async (plan: Plan, shareUrl?: string): Promise<void> 
 };
 
 // 导出为图片
-export const exportToImage = async (plan: Plan, format: 'png' | 'jpeg', shareUrl?: string): Promise<void> => {
+export const exportToImage = async (plan: any, format: 'png' | 'jpeg', shareUrl?: string): Promise<void> => {
   try {
     // 创建临时容器
     const tempContainer = document.createElement('div');
@@ -554,7 +554,7 @@ export const exportToImage = async (plan: Plan, format: 'png' | 'jpeg', shareUrl
 };
 
 // 生成分享链接
-export const generateShareLink = async (plan: Plan): Promise<string> => {
+export const generateShareLink = async (plan: any): Promise<string> => {
   try {
     // 模拟API调用
     await new Promise(resolve => setTimeout(resolve, 1500));

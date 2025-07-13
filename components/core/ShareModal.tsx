@@ -18,14 +18,14 @@ import {
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { cn, copyToClipboard, checkClipboardSupport, isMobileDevice } from '@/lib/utils';
-import { type Plan } from '@/lib/mock-plans';
+// ShareModal组件使用any类型支持不同数据源
 import { toast } from '@/lib/stores/useToastStore';
 import { exportToPDF, exportToImage, generateShareLink } from '@/lib/export-utils';
 
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  plan: Plan;
+  plan: any; // 支持Supabase数据格式
 }
 
 interface ShareOption {
