@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0",
+    "dev": "ipconfig | findstr \"IPv4 地址\" && echo Next.js 开发服务器在局域网开放的地址: 请使用上方显示的 IPv4 地址和端口 3000 访问，例如 http://192.168.1.100:3000/ && next dev -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

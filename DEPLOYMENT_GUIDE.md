@@ -40,10 +40,34 @@
 在 Vercel 项目设置中添加以下环境变量：
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=你的supabase项目URL
-NEXT_PUBLIC_SUPABASE_ANON_KEY=你的supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=你的service_role_key（可选）
+NEXT_PUBLIC_SUPABASE_URL=https://xjbzyrrjprqxvrgxfryd.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnp5cnJqcHJxeHZyZ3hmcnlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0MDc5MjgsImV4cCI6MjA2Nzk4MzkyOH0.aK3EIcsV80-gTXoNCnvX8JQRiJxel911dhs8qO3X20Y
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhqYnp5cnJqcHJxeHZyZ3hmcnlkIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MjQwNzkyOCwiZXhwIjoyMDY3OTgzOTI4fQ.__702C3NWRg_9bXwvLYw6L76Gs41m-_hdj6uI3nbac8
 ```
+
+#### Vercel 部署详细步骤
+1. **项目导入**:
+   - 登录 [Vercel Dashboard](https://vercel.com/dashboard)
+   - 点击 "Add New..." → "Project" 
+   - 连接 GitHub 并选择 "Curio" 仓库
+   - 确认根目录结构正确（项目文件直接在根目录）
+
+2. **部署配置**:
+   - Framework: Next.js (自动检测)
+   - Build Command: `npm run build`
+   - Output Directory: `.next`
+   - Install Command: `npm ci`
+   - Node.js Version: 18.x
+
+3. **环境变量设置**:
+   - 在项目设置中进入 "Environment Variables"
+   - 逐个添加上述三个环境变量
+   - 点击 "Redeploy" 重新部署
+
+4. **验证部署**:
+   - 访问 Vercel 提供的部署 URL
+   - 测试用户注册/登录功能
+   - 验证数据库连接和功能正常
 
 ## 🔧 本地开发设置
 
