@@ -66,8 +66,8 @@ const ApprovalSection: React.FC<{ plan: Plan; onUpdate: (updatedPlan: Plan) => v
     const activity = createActivity('comment', `发表了审批意见: "${approvalComment}"`);
     onUpdate({
       ...plan,
-      approvals: [...plan.approvals, newApproval],
-      activities: [...plan.activities, activity],
+      approvals: [...(plan.approvals || []), newApproval],
+      activities: [...(plan.activities || []), activity],
       updatedAt: new Date(),
     });
 
@@ -154,8 +154,8 @@ const ApprovalSection: React.FC<{ plan: Plan; onUpdate: (updatedPlan: Plan) => v
 
       {/* 审批列表 */}
       <div className="space-y-3">
-        {plan.approvals.map((approval, index) => {
-          const member = plan.members.find(m => m.id === approval.memberId);
+        {(plan.approvals || []).map((approval, index) => {
+          const member = (plan.plan_members || []).find(m => m.id === approval.memberId);
           return (
             <motion.div
               key={approval.id}
@@ -308,7 +308,7 @@ const MembersSection: React.FC<{ plan: any, onUpdate: (updates: any) => void }> 
       const activity = createActivity('member', `邀请了新成员: ${inviteEmail}`);
       onUpdate({
         ...plan,
-        activities: [...plan.activities, activity]
+        activities: [...(plan.activities || []), activity]
       });
       toast.info(`邀请已发送至 ${inviteEmail}`, '成员接受邀请后将出现在列表中。');
       setInviteEmail('');
@@ -323,7 +323,7 @@ const MembersSection: React.FC<{ plan: any, onUpdate: (updates: any) => void }> 
       <div className="flex items-center justify-between">
         <h3 className="text-xl font-semibold flex items-center gap-2">
           <Users className="w-5 h-5" />
-          团队成员 ({plan.members.length})
+          团队成员 ({plan.plan_members?.length || 0})
         </h3>
         <button
           onClick={() => setShowInviteForm(!showInviteForm)}
@@ -369,7 +369,7 @@ const MembersSection: React.FC<{ plan: any, onUpdate: (updates: any) => void }> 
 
       {/* 成员列表 */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {plan.members.map((member, index) => (
+        {(plan.plan_members || []).map((member, index) => (
           <motion.div
             key={member.id}
             initial={{ opacity: 0, y: 20 }}
@@ -578,7 +578,7 @@ const PathsSection: React.FC<{
   // --- Helper to recalculate plan status ---
   const recalculatePlanStatus = (paths: any[]) => {
     // 改进：基于所有里程碑的完成情况来计算进度，而不仅仅是路径状态
-    const totalMilestones = paths.reduce((total, path) => total + path.milestones.length, 0);
+    const totalMilestones = paths.reduce((total, path) => total + (path.milestones?.length || 0), 0);
     
     if (totalMilestones === 0) {
       return { 
@@ -593,7 +593,7 @@ const PathsSection: React.FC<{
     }
     
     const completedMilestones = paths.reduce((total, path) => 
-      total + path.milestones.filter(m => m.completed).length, 0
+      total + (path.milestones?.filter(m => m.completed)?.length || 0), 0
     );
     
     const progress = Math.round((completedMilestones / totalMilestones) * 100);
@@ -633,30 +633,30 @@ const PathsSection: React.FC<{
     const activity = createActivity('update', `添加了新的执行路径: "${title}"`);
     onUpdate({
       ...plan,
-      paths: [...plan.paths, newPath],
+      paths: [...(plan.paths || []), newPath],
       activities: [...plan.activities, activity]
     });
     setIsAddingPath(false);
   };
 
   const updatePath = (pathId: string, updates: { title?: string; description?: string }) => {
-    const updatedPaths = plan.paths.map(p => p.id === pathId ? { ...p, ...updates } : p);
+    const updatedPaths = (plan.paths || []).map(p => p.id === pathId ? { ...p, ...updates } : p);
 
     const activity = createActivity('update', `更新了路径 "${updatedPaths.find(p=>p.id === pathId)?.title}" 的信息.`);
     onUpdate({
       ...plan,
       paths: updatedPaths,
-      activities: [...plan.activities, activity],
+      activities: [...(plan.activities || []), activity],
       updatedAt: new Date(),
      });
     toast.success('执行路径已更新', '路径信息已成功保存。');
   };
 
   const deletePath = (pathId: string) => {
-    const pathToDelete = plan.paths.find(p => p.id === pathId);
+    const pathToDelete = (plan.paths || []).find(p => p.id === pathId);
     if (!pathToDelete) return;
 
-    const updatedPaths = plan.paths.filter(p => p.id !== pathId);
+    const updatedPaths = (plan.paths || []).filter(p => p.id !== pathId);
     const { status: newPlanStatus, progress: newPlanProgress, metrics: newMetrics } = recalculatePlanStatus(updatedPaths);
 
     const activity = createActivity('update', `删除了执行路径: "${pathToDelete.title}"`);
@@ -667,7 +667,7 @@ const PathsSection: React.FC<{
       status: newPlanStatus,
       progress: newPlanProgress,
       metrics: newMetrics,
-      activities: [...plan.activities, activity],
+      activities: [...(plan.activities || []), activity],
       updatedAt: new Date(),
     });
 
@@ -690,9 +690,9 @@ const PathsSection: React.FC<{
       date: new Date(),
       completed: false,
     };
-    const updatedPaths = plan.paths.map(p =>
+    const updatedPaths = (plan.paths || []).map(p =>
       p.id === pathId
-        ? { ...p, milestones: [...p.milestones, newMilestone] }
+        ? { ...p, milestones: [...(p.milestones || []), newMilestone] }
         : p
     );
     onUpdate({ ...plan, paths: updatedPaths });
@@ -709,10 +709,10 @@ const PathsSection: React.FC<{
     let milestoneCompleted: boolean | undefined;
     let newActivities: any[] = [];
 
-    const updatedPaths = plan.paths.map(path => {
+    const updatedPaths = (plan.paths || []).map(path => {
       if (path.id === pathId) {
         const originalPath = { ...path };
-        const updatedMilestones = path.milestones.map(m => {
+        const updatedMilestones = (path.milestones || []).map(m => {
           if (m.id === milestoneId) {
             milestoneTitle = m.title;
             if (updates.completed !== undefined && m.completed !== updates.completed) {
@@ -731,8 +731,8 @@ const PathsSection: React.FC<{
            newActivities.push(createActivity('status_change', `路径 "${originalPath.title}" 的状态更新为: ${newPathStatus === 'completed' ? '已完成' : '进行中'}`));
         }
         
-        const completedCount = updatedMilestones.filter(m => m.completed).length;
-        const progress = updatedMilestones.length > 0 ? Math.round((completedCount / updatedMilestones.length) * 100) : 0;
+        const completedCount = updatedMilestones?.filter(m => m.completed)?.length || 0;
+        const progress = (updatedMilestones?.length || 0) > 0 ? Math.round((completedCount / updatedMilestones.length) * 100) : 0;
 
         return { ...path, milestones: updatedMilestones, status: newPathStatus, progress: progress };
       }
@@ -755,31 +755,31 @@ const PathsSection: React.FC<{
       status: newPlanStatus,
       progress: newPlanProgress,
       metrics: newMetrics,
-      activities: [...plan.activities, ...newActivities],
+      activities: [...(plan.activities || []), ...newActivities],
       updatedAt: new Date(), // Update timestamp
     });
   };
 
   const deleteMilestone = (pathId: string, milestoneId: string) => {
-    const path = plan.paths.find(p => p.id === pathId);
+    const path = (plan.paths || []).find(p => p.id === pathId);
     if (!path) return;
     const milestone = path.milestones.find(m => m.id === milestoneId);
     if (!milestone) return;
 
-    let updatedPaths = plan.paths.map(p => 
+    let updatedPaths = (plan.paths || []).map(p => 
       p.id === pathId 
-        ? { ...p, milestones: p.milestones.filter(m => m.id !== milestoneId) } 
+        ? { ...p, milestones: (p.milestones || []).filter(m => m.id !== milestoneId) } 
         : p
     );
     
     // After deleting a milestone, we must also recalculate the status and progress of the affected path
     updatedPaths = updatedPaths.map(currentPath => {
       if (currentPath.id === pathId) {
-        const completedCount = currentPath.milestones.filter(m => m.completed).length;
-        const progress = currentPath.milestones.length > 0 ? Math.round((completedCount / currentPath.milestones.length) * 100) : 0;
+        const completedCount = currentPath.milestones?.filter(m => m.completed)?.length || 0;
+        const progress = (currentPath.milestones?.length || 0) > 0 ? Math.round((completedCount / currentPath.milestones.length) * 100) : 0;
         
         let newPathStatus = 'planning';
-        if (currentPath.milestones.length > 0) {
+        if ((currentPath.milestones?.length || 0) > 0) {
           if (progress === 100) {
             newPathStatus = 'completed';
           } else if (progress > 0) {
@@ -802,7 +802,7 @@ const PathsSection: React.FC<{
       status: newPlanStatus,
       progress: newPlanProgress,
       metrics: newMetrics,
-      activities: [...plan.activities, activity],
+      activities: [...(plan.activities || []), activity],
       updatedAt: new Date(),
     });
 
@@ -863,10 +863,10 @@ const PathsSection: React.FC<{
       </div>
       
       <div className="space-y-4">
-        {plan.paths.map((path, index) => {
+        {(plan.paths || []).map((path, index) => {
           // --- DYNAMIC PROGRESS CALCULATION ---
-          const completedMilestones = path.milestones.filter(m => m.completed).length;
-          const totalMilestones = path.milestones.length;
+          const completedMilestones = path.milestones?.filter(m => m.completed)?.length || 0;
+          const totalMilestones = path.milestones?.length || 0;
           const progress = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
 
           return (
@@ -974,7 +974,7 @@ const PathsSection: React.FC<{
                   </button>
                 </div>
 
-                {path.milestones.map(milestone => (
+                {(path.milestones || []).map(milestone => (
                   <MilestoneItem
                     key={milestone.id}
                     milestone={milestone}
@@ -1029,7 +1029,7 @@ const ActivitySection: React.FC<{ plan: Plan }> = ({ plan }) => {
         最新动态
       </h3>
       <div className="relative border-l-2 border-white/10 pl-8 space-y-8">
-        {[...plan.activities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((activity, index) => (
+        {[...(plan.activities || [])].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).map((activity, index) => (
           <motion.div
             key={activity.id}
             initial={{ opacity: 0, y: 20 }}
@@ -1168,7 +1168,7 @@ export default function PlanDetailPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4" />
-                    <span>{plan.members.length} 成员</span>
+                    <span>{plan.plan_members?.length || 0} 成员</span>
                   </div>
                 </div>
               </div>
@@ -1309,8 +1309,8 @@ export default function PlanDetailPage() {
                       const now = new Date();
                       
                       // 里程碑完成动态
-                      plan.paths.forEach(path => {
-                        path.milestones.forEach(milestone => {
+                      (plan.paths || []).forEach(path => {
+                        (path.milestones || []).forEach(milestone => {
                           if (milestone.completed) {
                             activities.push({
                               id: `milestone-${milestone.id}`,
@@ -1325,7 +1325,7 @@ export default function PlanDetailPage() {
                       });
                       
                       // 路径状态变更动态
-                      plan.paths.forEach(path => {
+                      (plan.paths || []).forEach(path => {
                         if (path.status === 'in_progress') {
                           activities.push({
                             id: `path-${path.id}`,
@@ -1378,8 +1378,8 @@ export default function PlanDetailPage() {
                     
                     {(() => {
                       // 如果没有动态，显示提示
-                      const hasActivities = plan.paths.some(path => 
-                        path.milestones.some(m => m.completed) || 
+                      const hasActivities = (plan.paths || []).some(path => 
+                        (path.milestones || []).some(m => m.completed) || 
                         path.status !== 'planning'
                       );
                       
@@ -1438,7 +1438,7 @@ export default function PlanDetailPage() {
                 <div className="p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
                   <h3 className="text-lg font-semibold mb-4">标签</h3>
                   <div className="flex flex-wrap gap-2">
-                    {plan.tags.map((tag) => (
+                    {(plan.tags || []).map((tag) => (
                       <span
                         key={tag}
                         className="px-3 py-1 bg-white/10 rounded-full text-sm"
