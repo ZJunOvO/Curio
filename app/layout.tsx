@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Providers } from './providers'
 import { FloatingNav } from '@/components/layout/FloatingNav'
 import { ToastProvider } from '@/components/ui/Toast'
+import { CacheInitializer } from '@/components/cache/CacheInitializer'
 import '@/styles/globals.css'
 
 export const metadata: Metadata = {
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-apple-gray-50 dark:bg-black antialiased">
         <Providers>
           <ToastProvider>
+            <CacheInitializer />
             <div className="relative">
               {children}
             </div>

@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
 import { getPlanDetails, updatePlan, type Plan } from '@/lib/supabase/database';
+import { clearPlanCaches } from '@/lib/cache/CacheUtils';
 import { toast } from '@/lib/stores/useToastStore';
 import { PlanStatsDashboard } from '@/components/core/charts';
 import { ShareModal } from '@/components/core';
@@ -1101,6 +1102,10 @@ export default function PlanDetailPage() {
     try {
       const updatedPlan = await updatePlan(plan.id, updates);
       setPlan({ ...plan, ...updatedPlan });
+      
+      // 清除相关缓存，确保下次访问获取最新数据
+      clearPlanCaches(plan.id);
+      
       toast.success('更新成功', '计划已保存');
     } catch (error) {
       console.error('更新计划失败:', error);

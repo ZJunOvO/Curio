@@ -1,4 +1,5 @@
 import { supabase } from './client'
+import { planCache, userCache, globalCache, wishCache } from '../cache/DataCache'
 
 // ================================================
 // 用户资料相关操作
@@ -15,18 +16,22 @@ export interface UserProfile {
 
 // 获取用户资料
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from('user_profiles')
-    .select('*')
-    .eq('id', userId)
-    .single()
+  const cacheKey = `user_profile_${userId}`;
+  
+  return await userCache.getOrSet(cacheKey, async () => {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
 
-  if (error) {
-    console.error('Error fetching user profile:', error)
-    return null
-  }
+    if (error) {
+      console.error('Error fetching user profile:', error)
+      return null
+    }
 
-  return data
+    return data
+  });
 }
 
 // 更新用户资料
@@ -42,6 +47,9 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
     console.error('Error updating user profile:', error)
     throw error
   }
+
+  // 清除用户缓存
+  userCache.delete(`user_profile_${userId}`);
 
   return data
 }
@@ -175,20 +183,24 @@ export interface Wish {
   updated_at: string
 }
 
-// 获取用户的心愿（包括绑定伙伴的心愿）
+// 获取用户的心愿（包括绑定伙伴的心愿）- 带缓存版本
 export async function getUserWishes(userId: string) {
-  const { data, error } = await supabase
-    .from('wishes')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
+  const cacheKey = `user_wishes_${userId}`;
+  
+  return await wishCache.getOrSet(cacheKey, async () => {
+    const { data, error } = await supabase
+      .from('wishes')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('Error fetching wishes:', error)
-    throw error
-  }
+    if (error) {
+      console.error('Error fetching wishes:', error)
+      throw error
+    }
 
-  return data || []
+    return data || []
+  });
 }
 
 // 创建心愿
@@ -204,11 +216,21 @@ export async function createWish(wish: Omit<Wish, 'id' | 'created_at' | 'updated
     throw error
   }
 
+  // 清除相关缓存
+  wishCache.delete(`user_wishes_${wish.user_id}`);
+
   return data
 }
 
 // 更新心愿
 export async function updateWish(wishId: string, updates: Partial<Wish>) {
+  // 先获取心愿数据以获得user_id
+  const { data: currentWish } = await supabase
+    .from('wishes')
+    .select('user_id')
+    .eq('id', wishId)
+    .single()
+
   const { data, error } = await supabase
     .from('wishes')
     .update(updates)
@@ -221,11 +243,23 @@ export async function updateWish(wishId: string, updates: Partial<Wish>) {
     throw error
   }
 
+  // 清除相关缓存
+  if (currentWish) {
+    wishCache.delete(`user_wishes_${currentWish.user_id}`);
+  }
+
   return data
 }
 
 // 删除心愿
 export async function deleteWish(wishId: string) {
+  // 先获取心愿数据以获得user_id
+  const { data: currentWish } = await supabase
+    .from('wishes')
+    .select('user_id')
+    .eq('id', wishId)
+    .single()
+
   const { error } = await supabase
     .from('wishes')
     .delete()
@@ -234,6 +268,11 @@ export async function deleteWish(wishId: string) {
   if (error) {
     console.error('Error deleting wish:', error)
     throw error
+  }
+
+  // 清除相关缓存
+  if (currentWish) {
+    wishCache.delete(`user_wishes_${currentWish.user_id}`);
   }
 }
 
@@ -470,25 +509,29 @@ export interface Milestone {
   updated_at: string
 }
 
-// 获取用户参与的所有计划 - 最简化版本，避免复杂JOIN
+// 获取用户参与的所有计划 - 带缓存的版本
 export async function getUserPlans(userId: string) {
-  console.log('🔍 开始查询用户计划, userId:', userId);
+  const cacheKey = `user_plans_${userId}`;
   
-  // 只查询用户创建的计划，避免复杂的RLS查询
-  const { data, error } = await supabase
-    .from('plans')
-    .select('*')
-    .eq('creator_id', userId)
-    .order('created_at', { ascending: false })
+  return await planCache.getOrSet(cacheKey, async () => {
+    console.log('🔍 开始查询用户计划, userId:', userId);
+    
+    // 只查询用户创建的计划，避免复杂的RLS查询
+    const { data, error } = await supabase
+      .from('plans')
+      .select('*')
+      .eq('creator_id', userId)
+      .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('❌ 查询计划失败:', error)
-    throw error
-  }
+    if (error) {
+      console.error('❌ 查询计划失败:', error)
+      throw error
+    }
 
-  console.log('✅ 查询成功，找到', data?.length || 0, '个计划');
-  
-  return data || [];
+    console.log('✅ 查询成功，找到', data?.length || 0, '个计划');
+    
+    return data || [];
+  });
 }
 
 // 测试数据库连接和认证
@@ -560,6 +603,9 @@ export async function createPlan(plan: Omit<Plan, 'id' | 'created_at' | 'updated
     throw memberError
   }
 
+  // 清除相关缓存
+  planCache.invalidate(`user_plans_${plan.creator_id}`);
+
   return newPlan
 }
 
@@ -577,6 +623,10 @@ export async function updatePlan(planId: string, updates: Partial<Plan>) {
     throw error
   }
 
+  // 清除相关缓存
+  planCache.delete(`plan_details_${planId}`);
+  planCache.invalidate(`user_plans_`); // 清除所有用户的计划列表缓存
+
   return data
 }
 
@@ -593,33 +643,131 @@ export async function deletePlan(planId: string) {
   }
 }
 
-// 获取计划详情（包含所有相关数据）
+// 获取计划详情（包含所有相关数据）- 带缓存的版本
 export async function getPlanDetails(planId: string) {
-  const { data: plan, error: planError } = await supabase
-    .from('plans')
-    .select(`
-      *,
-      creator:user_profiles!plans_creator_id_fkey(id, username, avatar_url),
-      plan_members(
-        user_id,
-        role,
-        joined_at,
-        user:user_profiles!plan_members_user_id_fkey(id, username, avatar_url)
-      ),
-      plan_paths(
+  const cacheKey = `plan_details_${planId}`;
+  
+  return await planCache.getOrSet(cacheKey, async () => {
+    console.log('🔍 开始查询计划详情, planId:', planId);
+    
+    const { data: plan, error: planError } = await supabase
+      .from('plans')
+      .select(`
         *,
-        milestones(*)
-      )
-    `)
-    .eq('id', planId)
-    .single()
+        creator:user_profiles!plans_creator_id_fkey(id, username, avatar_url, email),
+        plan_members(
+          user_id,
+          role,
+          joined_at,
+          user:user_profiles!plan_members_user_id_fkey(id, username, avatar_url, email)
+        ),
+        plan_paths(
+          *,
+          milestones(*)
+        )
+      `)
+      .eq('id', planId)
+      .single()
 
-  if (planError) {
-    console.error('Error fetching plan details:', planError)
-    throw planError
-  }
+    if (planError) {
+      console.error('❌ 查询计划详情失败:', planError)
+      throw planError
+    }
 
-  return plan
+    console.log('✅ 原始计划数据:', plan);
+
+    // 转换数据结构以匹配前端期望的格式
+    const transformedPlan = {
+      id: plan.id,
+      title: plan.title,
+      description: plan.description,
+      coverImage: plan.cover_image || 'https://picsum.photos/seed/plan/1200/600', // 提供默认封面
+      category: plan.category || 'general',
+      priority: plan.priority,
+      status: plan.status,
+      progress: plan.progress || 0,
+      startDate: plan.start_date,
+      targetDate: plan.target_date,
+      tags: plan.tags || [],
+      metrics: plan.metrics || {
+        totalBudget: 0,
+        spentBudget: 0,
+        totalTasks: 0,
+        completedTasks: 0
+      },
+      created_at: plan.created_at,
+      updated_at: plan.updated_at,
+      createdAt: plan.created_at,
+      updatedAt: plan.updated_at,
+      
+      // 创建者信息
+      creator: plan.creator ? {
+        id: plan.creator.id,
+        name: plan.creator.username || plan.creator.email || '匿名用户',
+        avatar: plan.creator.avatar_url || `https://i.pravatar.cc/150?u=${plan.creator.id}`,
+        email: plan.creator.email
+      } : {
+        id: plan.creator_id,
+        name: '匿名用户',
+        avatar: `https://i.pravatar.cc/150?u=${plan.creator_id}`,
+        email: ''
+      },
+      
+      // 团队成员
+      plan_members: plan.plan_members?.map(member => ({
+        id: member.user?.id || member.user_id,
+        name: member.user?.username || member.user?.email || '匿名用户',
+        avatar: member.user?.avatar_url || `https://i.pravatar.cc/150?u=${member.user_id}`,
+        role: member.role,
+        joined_at: member.joined_at
+      })) || [],
+      
+      // 执行路径
+      paths: plan.plan_paths?.map(path => ({
+        id: path.id,
+        title: path.title,
+        description: path.description || '',
+        status: path.status,
+        progress: path.progress || 0,
+        startDate: path.start_date,
+        endDate: path.end_date,
+        display_order: path.display_order,
+        created_at: path.created_at,
+        updated_at: path.updated_at,
+        
+        // 里程碑
+        milestones: path.milestones?.map(milestone => ({
+          id: milestone.id,
+          title: milestone.title,
+          description: milestone.description || '',
+          date: milestone.date,
+          completed: milestone.completed || false,
+          display_order: milestone.display_order,
+          created_at: milestone.created_at,
+          updated_at: milestone.updated_at
+        })) || []
+      })) || [],
+      
+      // 模拟数据，直到实现完整功能
+      activities: [],
+      approvals: [],
+      versions: [],
+      currentVersion: {
+        id: '1',
+        version: '1.0',
+        title: plan.title,
+        description: plan.description || '',
+        status: 'active',
+        createdAt: plan.created_at,
+        createdBy: plan.creator?.username || '创建者',
+        changes: []
+      }
+    };
+
+    console.log('✅ 转换后的计划数据:', transformedPlan);
+    
+    return transformedPlan;
+  }, 15 * 60 * 1000); // 15分钟缓存
 }
 
 // 添加计划成员
