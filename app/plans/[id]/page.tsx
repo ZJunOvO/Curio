@@ -8,7 +8,7 @@ import {
   CheckCircle, XCircle, MessageCircle, AlertCircle,
   GitBranch, History, UserPlus, MoreVertical,
   Eye, Edit, Trash, ChevronRight, Sparkles,
-  Shield, Crown, Zap, Plus, Trash2, BookOpen, Share2
+  Shield, Crown, Zap, Plus, Trash2, BookOpen, Share2, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
