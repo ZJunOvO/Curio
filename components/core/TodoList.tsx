@@ -193,18 +193,18 @@ const TodoList = React.forwardRef<HTMLDivElement, { className?: string }>(
                     value={newTodoTitle}
                     onChange={(e) => setNewTodoTitle(e.target.value)}
                     placeholder="输入任务标题..."
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 focus:bg-gray-700"
                     autoFocus
                   />
                   <div className="flex items-center gap-3">
                     <select
                       value={newTodoPriority}
                       onChange={(e) => setNewTodoPriority(e.target.value as 'low' | 'medium' | 'high')}
-                      className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-purple-500"
+                      className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-purple-500 focus:bg-gray-700"
                     >
-                      <option value="low">低优先级</option>
-                      <option value="medium">中优先级</option>
-                      <option value="high">高优先级</option>
+                      <option value="low" className="bg-gray-800 text-white">低优先级</option>
+                      <option value="medium" className="bg-gray-800 text-white">中优先级</option>
+                      <option value="high" className="bg-gray-800 text-white">高优先级</option>
                     </select>
                     <div className="flex gap-2 ml-auto">
                       <button

@@ -603,8 +603,25 @@ export async function createPlan(plan: Omit<Plan, 'id' | 'created_at' | 'updated
     throw memberError
   }
 
-  // 清除相关缓存
-  planCache.invalidate(`user_plans_${plan.creator_id}`);
+  // 优化缓存策略：直接更新缓存而不是清除，减少列表页面重载时间
+  const cacheKey = `user_plans_${plan.creator_id}`;
+  try {
+    // 尝试获取现有缓存
+    const existingPlans = planCache.get(cacheKey);
+    if (existingPlans && Array.isArray(existingPlans)) {
+      // 将新计划添加到缓存列表的开头（按创建时间倒序）
+      const updatedPlans = [newPlan, ...existingPlans];
+      planCache.set(cacheKey, updatedPlans);
+      console.log('✅ 已更新计划列表缓存，避免重新查询');
+    } else {
+      // 如果缓存不存在，则清除缓存让下次查询重新加载
+      planCache.invalidate(cacheKey);
+      console.log('🔄 缓存不存在，已清除缓存键');
+    }
+  } catch (error) {
+    console.error('❌ 更新缓存失败，回退到清除缓存:', error);
+    planCache.invalidate(cacheKey);
+  }
 
   return newPlan
 }
@@ -694,6 +711,18 @@ export async function getPlanDetails(planId: string) {
 
     console.log('✅ 原始计划数据:', plan);
 
+    // 动态计算任务进度（基于里程碑数据）
+    const allMilestones = plan.plan_paths?.flatMap(path => path.milestones || []) || [];
+    const totalTasks = allMilestones.length;
+    const completedTasks = allMilestones.filter(milestone => milestone.completed).length;
+    
+    console.log('📊 任务进度计算:', {
+      paths: plan.plan_paths?.length || 0,
+      totalMilestones: totalTasks,
+      completedMilestones: completedTasks,
+      progress: totalTasks > 0 ? `${completedTasks}/${totalTasks}` : '0/0'
+    });
+
     // 转换数据结构以匹配前端期望的格式
     const transformedPlan = {
       id: plan.id,
@@ -707,11 +736,12 @@ export async function getPlanDetails(planId: string) {
       startDate: plan.start_date,
       targetDate: plan.target_date,
       tags: plan.tags || [],
-      metrics: plan.metrics || {
-        totalBudget: 0,
-        spentBudget: 0,
-        totalTasks: 0,
-        completedTasks: 0
+      metrics: {
+        ...(plan.metrics || {}),
+        totalBudget: plan.metrics?.totalBudget || 0,
+        spentBudget: plan.metrics?.spentBudget || 0,
+        totalTasks: totalTasks,
+        completedTasks: completedTasks
       },
       created_at: plan.created_at,
       updated_at: plan.updated_at,
@@ -873,12 +903,24 @@ export async function createMilestone(milestone: Omit<Milestone, 'id' | 'created
   const { data, error } = await supabase
     .from('milestones')
     .insert(milestone)
-    .select()
+    .select(`
+      *,
+      plan_path:plan_paths!inner(
+        id,
+        plan_id
+      )
+    `)
     .single()
 
   if (error) {
     console.error('Error creating milestone:', error)
     throw error
+  }
+
+  // 清除相关的计划详情缓存以确保任务进度统计实时更新
+  if (data?.plan_path?.plan_id) {
+    planCache.delete(`plan_details_${data.plan_path.plan_id}`);
+    console.log('🔄 已清除计划详情缓存，任务进度将重新计算');
   }
 
   return data
@@ -890,7 +932,13 @@ export async function updateMilestone(milestoneId: string, updates: Partial<Mile
     .from('milestones')
     .update(updates)
     .eq('id', milestoneId)
-    .select()
+    .select(`
+      *,
+      plan_path:plan_paths!inner(
+        id,
+        plan_id
+      )
+    `)
     .single()
 
   if (error) {
@@ -898,11 +946,30 @@ export async function updateMilestone(milestoneId: string, updates: Partial<Mile
     throw error
   }
 
+  // 清除相关的计划详情缓存以确保任务进度统计实时更新
+  if (data?.plan_path?.plan_id) {
+    planCache.delete(`plan_details_${data.plan_path.plan_id}`);
+    console.log('🔄 已清除计划详情缓存，任务进度将重新计算');
+  }
+
   return data
 }
 
 // 删除里程碑
 export async function deleteMilestone(milestoneId: string) {
+  // 先获取里程碑信息以获得plan_id，用于清除缓存
+  const { data: milestoneData } = await supabase
+    .from('milestones')
+    .select(`
+      id,
+      plan_path:plan_paths!inner(
+        id,
+        plan_id
+      )
+    `)
+    .eq('id', milestoneId)
+    .single()
+
   const { error } = await supabase
     .from('milestones')
     .delete()
@@ -911,5 +978,11 @@ export async function deleteMilestone(milestoneId: string) {
   if (error) {
     console.error('Error deleting milestone:', error)
     throw error
+  }
+
+  // 清除相关的计划详情缓存以确保任务进度统计实时更新
+  if (milestoneData?.plan_path?.plan_id) {
+    planCache.delete(`plan_details_${milestoneData.plan_path.plan_id}`);
+    console.log('🔄 已清除计划详情缓存，任务进度将重新计算');
   }
 }

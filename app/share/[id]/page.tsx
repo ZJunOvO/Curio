@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getPlanDetails } from '@/lib/supabase/database';
+import { getCategoryDisplayName, getBudgetDisplayFormat } from '@/lib/utils/categoryMapper';
 
 // 从分享ID获取计划数据的函数
 const getPlanByShareId = async (shareId: string) => {
@@ -196,9 +197,7 @@ export default function SharePlanPage() {
                 },
                 {
                   label: '预算使用',
-                  value: plan.metrics.totalBudget
-                    ? `¥${(plan.metrics.spentBudget || 0).toLocaleString()}/${plan.metrics.totalBudget.toLocaleString()}`
-                    : '未设置',
+                  value: getBudgetDisplayFormat(plan.metrics.totalBudget, plan.metrics.spentBudget),
                   icon: TrendingUp,
                   color: 'green'
                 }
@@ -327,7 +326,7 @@ export default function SharePlanPage() {
               <div className="space-y-3">
                 <div>
                   <p className="text-sm text-gray-400">分类</p>
-                  <p className="font-medium capitalize">{plan.category}</p>
+                  <p className="font-medium">{getCategoryDisplayName(plan.category)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-400">状态</p>

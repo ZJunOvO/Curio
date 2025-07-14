@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/stores/useToastStore';
 import { useAuth } from '@/hooks/useAuth';
+import { usePlansCache } from '@/hooks/usePlansCache';
 import { createPlan, createPlanPath, createMilestone, addPlanMember } from '@/lib/supabase/database';
 
 interface Milestone {
@@ -944,7 +945,8 @@ PreviewStep.displayName = "PreviewStep";
 
 export default function CreatePlanPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
+  const { preloadPlans, addPlanToCache } = usePlansCache();
   const [currentStep, setCurrentStep] = useState<Step>('basic');
   const [isScrolled, setIsScrolled] = useState(false);
   const [formData, setFormData] = useState<PlanForm>({
@@ -962,6 +964,14 @@ export default function CreatePlanPage() {
   });
   
   const [newTag, setNewTag] = useState('');
+
+  // 认证保护
+  useEffect(() => {
+    if (!loading && !user) {
+      toast.error('请先登录', '需要登录才能创建计划');
+      router.push('/auth/login');
+    }
+  }, [user, loading, router]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -988,12 +998,21 @@ export default function CreatePlanPage() {
       return;
     }
 
+    // 验证必填字段
+    if (!formData.title.trim()) {
+      toast.error('标题不能为空', '请输入计划标题');
+      return;
+    }
+
     try {
+      // 显示创建进度
+      toast.info('正在创建计划', '请稍等...');
+      
       // 创建计划
       const planData = {
         creator_id: user.id,
-        title: formData.title,
-        description: formData.description,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
         cover_image: formData.coverImage || `https://picsum.photos/seed/${generateId()}/1600/900`,
         category: formData.category,
         priority: formData.priority,
@@ -1010,9 +1029,11 @@ export default function CreatePlanPage() {
         }
       };
 
-      console.log('创建计划:', planData);
+      console.log('🔍 创建计划数据:', planData);
+      console.log('👤 当前用户:', user);
+      
       const newPlan = await createPlan(planData);
-      console.log('计划已创建:', newPlan);
+      console.log('✅ 计划已创建:', newPlan);
 
       // 创建执行路径和里程碑
       for (const path of formData.executionPaths) {
@@ -1052,14 +1073,30 @@ export default function CreatePlanPage() {
       //   // 根据邮箱查找用户并添加为成员
       // }
 
+      // 优化：将新创建的计划添加到缓存中
+      addPlanToCache(newPlan);
+      
       toast.success(
         '计划已创建',
         `新计划 "${newPlan.title}" 已成功创建为草稿。`
       );
       router.push(`/plans/${newPlan.id}`);
     } catch (error) {
-      console.error('创建计划失败:', error);
-      toast.error('创建失败', '请稍后重试');
+      console.error('❌ 创建计划失败:', error);
+      
+      // 根据错误类型提供更详细的错误信息
+      if (error.message?.includes('JWT')) {
+        toast.error('认证失败', '请重新登录后再试');
+        router.push('/auth/login');
+      } else if (error.message?.includes('RLS')) {
+        toast.error('权限不足', '请检查您的账户权限');
+      } else if (error.message?.includes('duplicate key')) {
+        toast.error('创建失败', '计划名称已存在，请使用其他名称');
+      } else if (error.message?.includes('network')) {
+        toast.error('网络错误', '请检查网络连接后重试');
+      } else {
+        toast.error('创建失败', error.message || '请稍后重试');
+      }
     }
   }, [formData, router, user]);
 
@@ -1094,12 +1131,40 @@ export default function CreatePlanPage() {
     }));
   };
 
+  // 显示加载状态
+  if (loading) {
+    return (
+      <div className="h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/60">正在加载...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 如果用户未登录，显示重定向提示
+  if (!user) {
+    return (
+      <div className="h-screen bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-white/60">正在跳转到登录页面...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen bg-black overflow-hidden relative">
       <motion.button
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        onClick={() => router.push('/plans')}
+        onClick={() => {
+          // 优化：在导航前预加载计划列表，减少列表页面加载时间
+          preloadPlans();
+          router.push('/plans');
+        }}
         className="fixed top-8 left-8 z-50 p-3 rounded-full bg-white/10 backdrop-blur-xl text-white hover:bg-white/20 transition"
       >
         <ArrowLeft size={20} />

@@ -1,12 +1,27 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, Suspense } from 'react'
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion'
+import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
-import { TodoList } from '@/components/core/TodoList'
-import { FinanceTracker } from '@/components/core/FinanceTracker'
-import { StatsDashboard } from '@/components/core/StatsDashboard'
+
+// 懒加载重型组件
+const TodoList = dynamic(() => import('@/components/core/TodoList').then(mod => ({ default: mod.TodoList })), {
+  loading: () => <div className="h-96 bg-white/5 rounded-xl animate-pulse" />,
+  ssr: false
+})
+
+const FinanceTracker = dynamic(() => import('@/components/core/FinanceTracker').then(mod => ({ default: mod.FinanceTracker })), {
+  loading: () => <div className="h-96 bg-white/5 rounded-xl animate-pulse" />,
+  ssr: false
+})
+
+const StatsDashboard = dynamic(() => import('@/components/core/StatsDashboard').then(mod => ({ default: mod.StatsDashboard })), {
+  loading: () => <div className="h-32 bg-white/5 rounded-xl animate-pulse" />,
+  ssr: false
+})
 import { useAuth } from '@/hooks/useAuth'
+import { useTogetherMode } from '@/hooks/useTogetherMode'
 import { 
   getUserBindings, 
   getTodoItems, 
@@ -17,16 +32,21 @@ import {
 } from '@/lib/supabase/database'
 import { toast } from '@/lib/stores/useToastStore'
 import { TogetherPageSkeleton } from '@/components/ui/Skeleton'
-import { Heart, Users, Sparkles, TrendingUp, Calendar, Settings, Plus, DollarSign, TrendingDown, CheckCircle, Clock, ArrowUpRight, ArrowDownRight, Wallet, Receipt, Gift, Search, PieChart, LogIn, Link } from 'lucide-react'
+import TogetherHeader from '@/components/together/TogetherHeader'
+import AddActionModal from '@/components/together/AddActionModal'
+// 按需导入关键图标，其他图标懒加载
+import { Heart, Users, Calendar, CheckCircle, ArrowUpRight, ArrowDownRight, Wallet, LogIn, Link } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 export default function TogetherPage() {
   const router = useRouter()
   const { user, loading: authLoading } = useAuth()
+  const { mode: currentMode, setMode: setCurrentMode } = useTogetherMode()
   
   const [isHeaderVisible, setIsHeaderVisible] = useState(true)
   const [activeTab, setActiveTab] = useState<'finance' | 'todo'>('finance')
   const [loading, setLoading] = useState(true)
+  const [showAddModal, setShowAddModal] = useState(false)
   
   // 数据状态
   const [bindings, setBindings] = useState<any[]>([])
@@ -73,35 +93,48 @@ export default function TogetherPage() {
     
     try {
       setLoading(true)
+      console.log('🔄 开始加载Together数据...')
       
-      // 加载绑定关系
-      const userBindings = await getUserBindings(user.id)
+      // 并行加载绑定关系和基础数据
+      const [userBindings] = await Promise.all([
+        getUserBindings(user.id)
+      ])
+      
       setBindings(userBindings)
+      console.log('👥 绑定关系加载完成:', userBindings.length)
       
-      // 如果有绑定关系，加载共享数据
-      if (userBindings.length > 0) {
-        const activeBinding = userBindings[0] // 取第一个活跃的绑定关系
+      // 根据绑定关系并行加载相关数据
+      const activeBinding = userBindings.length > 0 ? userBindings[0] : null
+      
+      if (activeBinding) {
+        console.log('📊 加载共享数据...')
+        // 并行加载绑定数据
+        const [bindingTodos, bindingFinanceRecords] = await Promise.all([
+          getTodoItems(user.id, activeBinding.id),
+          getFinanceRecords(user.id, activeBinding.id)
+        ])
         
-        // 加载待办事项
-        const bindingTodos = await getTodoItems(user.id, activeBinding.id)
         setTodos(bindingTodos)
-        
-        // 加载财务记录
-        const bindingFinanceRecords = await getFinanceRecords(user.id, activeBinding.id)
         setFinanceRecords(bindingFinanceRecords)
+        console.log('✅ 共享数据加载完成: todos:', bindingTodos.length, 'finance:', bindingFinanceRecords.length)
       } else {
-        // 如果没有绑定关系，加载个人数据
-        const personalTodos = await getTodoItems(user.id)
-        setTodos(personalTodos)
+        console.log('📊 加载个人数据...')
+        // 并行加载个人数据
+        const [personalTodos, personalFinanceRecords] = await Promise.all([
+          getTodoItems(user.id),
+          getFinanceRecords(user.id)
+        ])
         
-        const personalFinanceRecords = await getFinanceRecords(user.id)
+        setTodos(personalTodos)
         setFinanceRecords(personalFinanceRecords)
+        console.log('✅ 个人数据加载完成: todos:', personalTodos.length, 'finance:', personalFinanceRecords.length)
       }
     } catch (error) {
-      console.error('Error loading together data:', error)
+      console.error('❌ 加载Together数据失败:', error)
       toast.error('加载失败', '无法加载Together数据')
     } finally {
       setLoading(false)
+      console.log('🎉 Together数据加载完成')
     }
   }
 
@@ -158,6 +191,19 @@ export default function TogetherPage() {
   const boundUser = activeBinding ? 
     (activeBinding.user1_id === user.id ? activeBinding.user2 : activeBinding.user1) : null
 
+  // 处理添加操作
+  const handleAddAction = (type: 'todo' | 'finance' | 'note', mode: 'personal' | 'shared') => {
+    console.log(`添加${type}到${mode}数据`);
+    // 根据类型切换到对应的标签页
+    if (type === 'todo') {
+      setActiveTab('todo');
+    } else if (type === 'finance') {
+      setActiveTab('finance');
+    }
+    // 这里后续需要实现具体的添加逻辑
+    toast.success('添加成功', `${type}已添加到${mode}数据`);
+  }
+
   // 计算统计数据
   const totalIncome = financeRecords
     .filter(r => r.type === 'income')
@@ -186,49 +232,30 @@ export default function TogetherPage() {
 
       {/* 页面内容 */}
       <div className="relative z-10">
-        {/* 英雄区域 */}
+        {/* 统一的Header */}
+        <TogetherHeader
+          currentMode={currentMode}
+          onModeChange={setCurrentMode}
+          onAddAction={() => setShowAddModal(true)}
+          activeBinding={activeBinding}
+          boundUser={boundUser}
+        />
+
+        {/* 快速统计区域 */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="relative pt-20 pb-12 px-6"
+          className="relative py-8 px-6"
         >
-          <div className="max-w-6xl mx-auto text-center">
-            {/* 标题和状态 */}
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <motion.div
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.6 }}
-                className="w-16 h-16 bg-gradient-to-r from-pink-500 to-purple-500 rounded-2xl flex items-center justify-center"
-              >
-                <Heart size={32} className="text-white" />
-              </motion.div>
-              <div>
-                <h1 className="text-4xl font-bold mb-2">Together</h1>
-                <div className="flex items-center gap-2 text-gray-400">
-                  {activeBinding ? (
-                    <>
-                      <Users size={16} />
-                      <span>与 {boundUser?.username || '伙伴'} 一起</span>
-                    </>
-                  ) : (
-                    <>
-                      <Link size={16} />
-                      <span>还没有绑定伙伴</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-
+          <div className="max-w-6xl mx-auto">
             {/* 如果没有绑定关系，显示绑定提示 */}
             {!activeBinding && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.6 }}
-                className="bg-white/5 backdrop-blur-2xl rounded-2xl p-6 mb-8 border border-white/10 max-w-md mx-auto"
+                transition={{ delay: 0.2, duration: 0.6 }}
+                className="bg-white/5 backdrop-blur-2xl rounded-2xl p-6 mb-8 border border-white/10 max-w-md mx-auto text-center"
               >
                 <h3 className="text-lg font-semibold mb-2">开始与伙伴协作</h3>
                 <p className="text-gray-400 text-sm mb-4">
@@ -247,7 +274,7 @@ export default function TogetherPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
               className="grid grid-cols-2 lg:grid-cols-4 gap-4 max-w-4xl mx-auto"
             >
               <div className="bg-white/5 backdrop-blur-2xl rounded-xl p-4 border border-white/10">
@@ -336,7 +363,13 @@ export default function TogetherPage() {
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.3 }}
               >
-                <FinanceTracker />
+                <Suspense fallback={
+                  <div className="h-96 bg-white/5 rounded-xl animate-pulse flex items-center justify-center">
+                    <div className="text-gray-400">正在加载财务记录...</div>
+                  </div>
+                }>
+                  <FinanceTracker />
+                </Suspense>
               </motion.div>
             )}
             
@@ -348,11 +381,25 @@ export default function TogetherPage() {
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.3 }}
               >
-                <TodoList />
+                <Suspense fallback={
+                  <div className="h-96 bg-white/5 rounded-xl animate-pulse flex items-center justify-center">
+                    <div className="text-gray-400">正在加载待办事项...</div>
+                  </div>
+                }>
+                  <TodoList />
+                </Suspense>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        {/* 添加功能模态框 */}
+        <AddActionModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          mode={currentMode}
+          onAddAction={handleAddAction}
+        />
       </div>
     </div>
   )

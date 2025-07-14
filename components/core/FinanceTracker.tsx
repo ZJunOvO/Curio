@@ -13,23 +13,23 @@ import {
 } from '@/lib/supabase/database'
 import { toast } from '@/lib/stores/useToastStore'
 import { cn } from '@/lib/utils'
+// 按需导入常用图标，其他图标动态加载
 import { 
-  Coffee, Car, Gamepad2, ShoppingBag, Dumbbell, Home, GraduationCap, MoreHorizontal, 
-  TrendingUp, DollarSign, Calendar, Tag, User, Clock, CheckCircle, Edit, Search, 
-  Trash2, Plus, ArrowUpRight, ArrowDownRight, Filter
+  Coffee, Car, ShoppingBag, Home, DollarSign, Calendar, 
+  Plus, ArrowUpRight, ArrowDownRight, Search, Filter, Edit, Trash2, Tags
 } from 'lucide-react'
 import { SimpleLoader } from '@/components/ui/Skeleton'
 
 const categoryIcons: Record<string, React.ReactNode> = {
   '餐饮': <Coffee className="w-4 h-4" />,
   '交通': <Car className="w-4 h-4" />,
-  '娱乐': <Gamepad2 className="w-4 h-4" />,
+  '娱乐': <DollarSign className="w-4 h-4" />, // 临时使用已导入的图标
   '购物': <ShoppingBag className="w-4 h-4" />,
-  '健康': <Dumbbell className="w-4 h-4" />,
+  '健康': <DollarSign className="w-4 h-4" />, // 临时使用已导入的图标  
   '住房': <Home className="w-4 h-4" />,
-  '教育': <GraduationCap className="w-4 h-4" />,
-  '工资': <TrendingUp className="w-4 h-4" />,
-  '其他': <MoreHorizontal className="w-4 h-4" />
+  '教育': <DollarSign className="w-4 h-4" />, // 临时使用已导入的图标
+  '工资': <ArrowUpRight className="w-4 h-4" />, // 使用已导入的图标
+  '其他': <DollarSign className="w-4 h-4" /> // 使用已导入的图标
 }
 
 const categoryColors: Record<string, string> = {
@@ -239,33 +239,33 @@ const FinanceTracker = React.forwardRef<HTMLDivElement, { className?: string }>(
 
           {/* 筛选和搜索 */}
           <div className="flex items-center gap-3">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="搜索记录..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
+                className="w-full min-w-[200px] pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-gray-700"
               />
             </div>
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value as 'all' | 'income' | 'expense')}
-              className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-green-500"
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 focus:bg-gray-700"
             >
-              <option value="all">全部类型</option>
-              <option value="income">收入</option>
-              <option value="expense">支出</option>
+              <option value="all" className="bg-gray-800 text-white">全部类型</option>
+              <option value="income" className="bg-gray-800 text-white">收入</option>
+              <option value="expense" className="bg-gray-800 text-white">支出</option>
             </select>
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
-              className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-green-500"
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 focus:bg-gray-700"
             >
-              <option value="all">全部分类</option>
+              <option value="all" className="bg-gray-800 text-white">全部分类</option>
               {Object.keys(categoryIcons).map(category => (
-                <option key={category} value={category}>{category}</option>
+                <option key={category} value={category} className="bg-gray-800 text-white">{category}</option>
               ))}
             </select>
           </div>
@@ -286,10 +286,10 @@ const FinanceTracker = React.forwardRef<HTMLDivElement, { className?: string }>(
                     <select
                       value={newRecord.type}
                       onChange={(e) => setNewRecord({ ...newRecord, type: e.target.value as 'income' | 'expense' })}
-                      className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-green-500"
+                      className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 focus:bg-gray-700"
                     >
-                      <option value="expense">支出</option>
-                      <option value="income">收入</option>
+                      <option value="expense" className="bg-gray-800 text-white">支出</option>
+                      <option value="income" className="bg-gray-800 text-white">收入</option>
                     </select>
                     <input
                       type="number"
@@ -297,24 +297,25 @@ const FinanceTracker = React.forwardRef<HTMLDivElement, { className?: string }>(
                       placeholder="金额"
                       value={newRecord.amount}
                       onChange={(e) => setNewRecord({ ...newRecord, amount: e.target.value })}
-                      className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
+                      className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-gray-700"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <select
                       value={newRecord.category}
                       onChange={(e) => setNewRecord({ ...newRecord, category: e.target.value })}
-                      className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-green-500"
+                      className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 focus:bg-gray-700"
                     >
                       {Object.keys(categoryIcons).map(category => (
-                        <option key={category} value={category}>{category}</option>
+                        <option key={category} value={category} className="bg-gray-800 text-white">{category}</option>
                       ))}
                     </select>
                     <input
                       type="date"
                       value={newRecord.date}
                       onChange={(e) => setNewRecord({ ...newRecord, date: e.target.value })}
-                      className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-green-500"
+                      className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-green-500 focus:bg-gray-700"
+                      style={{ colorScheme: 'dark' }}
                     />
                   </div>
                   <input
@@ -322,7 +323,7 @@ const FinanceTracker = React.forwardRef<HTMLDivElement, { className?: string }>(
                     placeholder="描述"
                     value={newRecord.description}
                     onChange={(e) => setNewRecord({ ...newRecord, description: e.target.value })}
-                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-gray-700"
                   />
                   <div className="flex gap-2 justify-end">
                     <button
@@ -401,7 +402,7 @@ const FinanceTracker = React.forwardRef<HTMLDivElement, { className?: string }>(
                             </div>
                             <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
                               <span className="flex items-center gap-1">
-                                <Tag size={12} />
+                                <Tags size={12} />
                                 {record.category}
                               </span>
                               <span className="flex items-center gap-1">

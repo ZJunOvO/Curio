@@ -65,10 +65,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, plan })
   const handleExportToPDF = async () => {
     setLoading('pdf');
     try {
+      console.log('📋 ShareModal: 开始导出PDF，计划数据:', plan);
       await exportToPDF(plan, shareLink || undefined);
       toast.success('PDF导出成功', '文件已保存到下载文件夹');
     } catch (error) {
-      toast.error('导出失败', '无法导出PDF文件，请稍后重试');
+      console.error('❌ ShareModal PDF导出失败:', error);
+      toast.error('导出失败', error.message || '无法导出PDF文件，请稍后重试');
     } finally {
       setLoading(null);
     }
@@ -78,10 +80,12 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, plan })
   const handleExportToImage = async (format: 'png' | 'jpeg') => {
     setLoading(format);
     try {
+      console.log(`🖼️ ShareModal: 开始导出${format.toUpperCase()}，计划数据:`, plan);
       await exportToImage(plan, format, shareLink || undefined);
       toast.success(`${format.toUpperCase()}导出成功`, '文件已保存到下载文件夹');
     } catch (error) {
-      toast.error('导出失败', `无法导出${format.toUpperCase()}文件，请稍后重试`);
+      console.error(`❌ ShareModal ${format.toUpperCase()}导出失败:`, error);
+      toast.error('导出失败', error.message || `无法导出${format.toUpperCase()}文件，请稍后重试`);
     } finally {
       setLoading(null);
     }

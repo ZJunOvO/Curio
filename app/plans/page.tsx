@@ -6,9 +6,11 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent } from 'framer-motion';
 import { Plus, Search, Clock, Zap, LayoutGrid, GitBranch, Trello, LogIn } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { getUserPlans, testDatabaseConnection, type Plan } from '@/lib/supabase/database';
+import { usePlansCache } from '@/hooks/usePlansCache';
+import { testDatabaseConnection, type Plan } from '@/lib/supabase/database';
 import { toast } from '@/lib/stores/useToastStore';
 import { PlanListSkeleton } from '@/components/ui/Skeleton';
+import { getCategoryDisplayName } from '@/lib/utils/categoryMapper';
 
 const getPriorityIcon = (priority: string) => {
   if (priority === 'high') return <Zap className="w-4 h-4 text-red-400" />;
@@ -34,9 +36,8 @@ const getDueDateStatus = (targetDate: string) => {
 export default function PlansPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { plans, loading, refreshPlans, isCacheValid } = usePlansCache();
   
-  const [plans, setPlans] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'timeline' | 'kanban'>('grid');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,49 +69,18 @@ export default function PlansPage() {
     lastScrollY.current = currentScrollY;
   });
 
-  // 加载计划数据
+  // 添加页面获得焦点时的优化逻辑
   useEffect(() => {
-    if (user) {
-      loadPlans();
-    } else if (!authLoading) {
-      setLoading(false);
-    }
-  }, [user, authLoading]);
-
-  const loadPlans = async () => {
-    if (!user) {
-      console.log('❌ 用户未登录，无法加载计划');
-      return;
-    }
-    
-    console.log('🔄 开始加载计划数据, 用户ID:', user.id);
-    
-    // 首先测试数据库连接
-    const testResult = await testDatabaseConnection();
-    console.log('🔍 数据库测试结果:', testResult);
-    
-    try {
-      setLoading(true);
-      const userPlans = await getUserPlans(user.id);
-      console.log('✅ 计划加载成功:', userPlans?.length || 0, '个计划');
-      setPlans(userPlans || []);
-      
-      if (!userPlans || userPlans.length === 0) {
-        console.log('💭 没有找到计划数据，但无错误（正常情况）');
+    const handleVisibilityChange = () => {
+      if (!document.hidden && user && !isCacheValid()) {
+        console.log('🔄 页面重新获得焦点，缓存已过期，刷新数据');
+        refreshPlans();
       }
-    } catch (error) {
-      console.error('❌ 加载计划失败:', error);
-      console.error('❌ 错误详情:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code
-      });
-      toast.error('加载失败', `无法加载计划数据: ${error.message || '未知错误'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, isCacheValid, refreshPlans]);
 
   const filteredPlans = useMemo(() => {
     return plans
@@ -447,7 +417,7 @@ const PlanCard: React.FC<{ plan: any; index: number; viewMode: 'grid' | 'timelin
         <div className="flex items-end justify-between">
           <div className="flex-1">
             <h3 className="text-lg sm:text-xl font-bold line-clamp-2">{plan.title}</h3>
-            <p className="text-sm text-gray-300 mt-1 line-clamp-1">{plan.category}</p>
+            <p className="text-sm text-gray-300 mt-1 line-clamp-1">{getCategoryDisplayName(plan.category)}</p>
           </div>
           <div className="flex -space-x-3">
             {plan.plan_members?.slice(0, 3).map((member: any, idx: number) => (

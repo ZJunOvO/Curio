@@ -1,16 +1,135 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Plus, Heart, Layers3, Calendar, X, Users, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { useUIStore } from '@/lib/stores/useUIStore';
 import { toast } from '@/lib/stores/useToastStore';
+import dynamic from 'next/dynamic';
+
+// 通用模块预加载策略 - 优化大模块间切换延迟
+const preloadModuleComponents = {
+  together: () => {
+    if (typeof window !== 'undefined') {
+      console.log('🚀 开始预加载Together页面组件...');
+      
+      // 预加载FinanceTracker
+      import('@/components/core/FinanceTracker').then(() => {
+        console.log('✅ FinanceTracker预加载完成');
+      });
+      
+      // 预加载TodoList  
+      import('@/components/core/TodoList').then(() => {
+        console.log('✅ TodoList预加载完成');
+      });
+      
+      // 预加载StatsDashboard
+      import('@/components/core/StatsDashboard').then(() => {
+        console.log('✅ StatsDashboard预加载完成');
+      });
+    }
+  },
+  
+  plans: () => {
+    if (typeof window !== 'undefined') {
+      console.log('🚀 开始预加载Plans页面组件...');
+      
+      // 预加载计划相关组件
+      import('@/components/core/charts').then(() => {
+        console.log('✅ PlanStatsDashboard预加载完成');
+      });
+      
+      import('@/components/core/ShareModal').then(() => {
+        console.log('✅ ShareModal预加载完成');
+      });
+      
+      import('@/components/ui/ImageUpload').then(() => {
+        console.log('✅ ImageUpload预加载完成');
+      });
+    }
+  },
+  
+  wishes: () => {
+    if (typeof window !== 'undefined') {
+      console.log('🚀 开始预加载Wishes页面组件...');
+      
+      // 预加载心愿相关组件
+      import('@/components/core/WishCard').then(() => {
+        console.log('✅ WishCard预加载完成');
+      }).catch(() => {
+        console.log('⚠️ WishCard组件不存在，跳过预加载');
+      });
+      
+      import('@/components/core/WishGallery').then(() => {
+        console.log('✅ WishGallery预加载完成');
+      }).catch(() => {
+        console.log('⚠️ WishGallery组件不存在，跳过预加载');
+      });
+    }
+  }
+};
+
+// 预加载Together页面的重型组件（向后兼容）
+const preloadTogetherComponents = preloadModuleComponents.together;
+
+// 路由预加载策略 - 优化页面切换速度
+const preloadRoutes = {
+  '/plans': () => {
+    if (typeof window !== 'undefined') {
+      console.log('🚀 预加载Plans路由...');
+      // 预加载Plans页面
+      import('../../app/plans/page').then(() => {
+        console.log('✅ Plans页面预加载完成');
+      }).catch(() => {
+        console.log('⚠️ Plans页面预加载失败');
+      });
+    }
+  },
+  
+  '/together': () => {
+    if (typeof window !== 'undefined') {
+      console.log('🚀 预加载Together路由...');
+      // 预加载Together页面
+      import('../../app/together/page').then(() => {
+        console.log('✅ Together页面预加载完成');
+      }).catch(() => {
+        console.log('⚠️ Together页面预加载失败');
+      });
+    }
+  },
+  
+  '/add-wish': () => {
+    if (typeof window !== 'undefined') {
+      console.log('🚀 预加载AddWish路由...');
+      // 预加载AddWish页面
+      import('../../app/add-wish/page').then(() => {
+        console.log('✅ AddWish页面预加载完成');
+      }).catch(() => {
+        console.log('⚠️ AddWish页面预加载失败');
+      });
+    }
+  }
+};
 
 export function FloatingNav() {
   const router = useRouter();
   const pathname = usePathname();
+  
+  // 模块预加载状态管理
+  const [preloadStatus, setPreloadStatus] = useState({
+    together: false,
+    plans: false,
+    wishes: false
+  });
+  
+  // 路由预加载状态管理
+  const [routePreloadStatus, setRoutePreloadStatus] = useState({
+    '/plans': false,
+    '/together': false,
+    '/add-wish': false
+  });
   
   // 使用全局UI状态
   const { 
@@ -44,6 +163,37 @@ export function FloatingNav() {
       );
     }
   };
+
+  // 通用模块悬停预加载处理
+  const handleModuleHover = (moduleName: keyof typeof preloadStatus) => {
+    if (!preloadStatus[moduleName]) {
+      preloadModuleComponents[moduleName]();
+      setPreloadStatus(prev => ({
+        ...prev,
+        [moduleName]: true
+      }));
+    }
+  };
+  
+  // 路由预加载处理
+  const handleRoutePreload = (route: keyof typeof routePreloadStatus) => {
+    if (!routePreloadStatus[route]) {
+      preloadRoutes[route]();
+      setRoutePreloadStatus(prev => ({
+        ...prev,
+        [route]: true
+      }));
+    }
+  };
+  
+  // 综合预加载处理 - 同时预加载组件和路由
+  const handleComprehensivePreload = (moduleName: keyof typeof preloadStatus, route: keyof typeof routePreloadStatus) => {
+    handleModuleHover(moduleName);
+    handleRoutePreload(route);
+  };
+  
+  // 处理Together按钮悬停预加载（向后兼容）
+  const handleTogetherHover = () => handleModuleHover('together');
 
   // 键盘事件监听
   useEffect(() => {
@@ -118,6 +268,7 @@ export function FloatingNav() {
               </button>
               <button
                 onClick={() => router.push('/plans')}
+                onMouseEnter={() => handleComprehensivePreload('plans', '/plans')}
                 className={cn(
                   'p-2.5 rounded-xl transition-all duration-300',
                   'hover:scale-105 active:scale-95',
@@ -129,6 +280,7 @@ export function FloatingNav() {
               </button>
               <button
                 onClick={() => router.push('/together')}
+                onMouseEnter={() => handleComprehensivePreload('together', '/together')}
                 className={cn(
                   'p-2.5 rounded-xl transition-all duration-300',
                   'hover:scale-105 active:scale-95',
@@ -156,6 +308,7 @@ export function FloatingNav() {
               {isHomePage && (
                 <button
                   onClick={handleToggleFavorites}
+                  onMouseEnter={() => handleModuleHover('wishes')}
                   className={cn(
                     'p-2.5 rounded-xl transition-all duration-300',
                     'hover:scale-105 active:scale-95',
@@ -170,6 +323,7 @@ export function FloatingNav() {
               )}
               <button
                 onClick={navigateToAddWish}
+                onMouseEnter={() => handleComprehensivePreload('wishes', '/add-wish')}
                 className={cn(
                   'p-2.5 rounded-xl transition-all duration-300',
                   'bg-apple-blue text-white shadow-lg hover:bg-apple-blue/80',

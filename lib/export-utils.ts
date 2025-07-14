@@ -5,9 +5,15 @@ import QRCode from 'qrcode';
 
 // 创建计划的HTML内容用于导出
 export const createPlanExportHTML = (plan: any, shareUrl?: string): string => {
-  const completedTasks = plan.metrics.completedTasks;
-  const totalTasks = plan.metrics.totalTasks;
+  // 安全地访问属性，提供默认值
+  const metrics = plan.metrics || { completedTasks: 0, totalTasks: 0 };
+  const completedTasks = metrics.completedTasks || 0;
+  const totalTasks = metrics.totalTasks || 0;
   const progressPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const progress = plan.progress || 0;
+  const paths = plan.paths || [];
+  const members = plan.members || [];
+  const tags = plan.tags || [];
 
   return `
     <!DOCTYPE html>
@@ -302,19 +308,19 @@ export const createPlanExportHTML = (plan: any, shareUrl?: string): string => {
     </head>
     <body>
       <div class="header">
-        <h1 class="title">${plan.title}</h1>
-        <p class="description">${plan.description}</p>
+        <h1 class="title">${plan.title || '未命名计划'}</h1>
+        <p class="description">${plan.description || '暂无描述'}</p>
         <div class="meta-info">
-          <span>📅 开始日期：${new Date(plan.startDate).toLocaleDateString('zh-CN')}</span>
-          <span>🎯 目标日期：${new Date(plan.targetDate).toLocaleDateString('zh-CN')}</span>
-          <span>👥 团队成员：${plan.members.length}人</span>
-          <span>📊 分类：${plan.category}</span>
+          <span>📅 开始日期：${plan.startDate ? new Date(plan.startDate).toLocaleDateString('zh-CN') : '未设置'}</span>
+          <span>🎯 目标日期：${plan.targetDate ? new Date(plan.targetDate).toLocaleDateString('zh-CN') : '未设置'}</span>
+          <span>👥 团队成员：${members.length}人</span>
+          <span>📊 分类：${plan.category || '未分类'}</span>
         </div>
       </div>
 
       <div class="progress-section">
         <div class="progress-circle">
-          <div class="progress-text">${plan.progress}%</div>
+          <div class="progress-text">${progress}%</div>
         </div>
         <h3>整体进度</h3>
         <p>已完成 ${completedTasks} / ${totalTasks} 项任务</p>
@@ -326,45 +332,45 @@ export const createPlanExportHTML = (plan: any, shareUrl?: string): string => {
           <div class="metric-label">任务完成情况</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${plan.progress}%</div>
+          <div class="metric-value">${progress}%</div>
           <div class="metric-label">整体进度</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${plan.paths.length}</div>
+          <div class="metric-value">${paths.length}</div>
           <div class="metric-label">执行路径</div>
         </div>
         <div class="metric-card">
-          <div class="metric-value">${plan.members.length}</div>
+          <div class="metric-value">${members.length}</div>
           <div class="metric-label">团队成员</div>
         </div>
       </div>
 
       <div class="paths-section">
         <h2 class="section-title">执行路径</h2>
-        ${plan.paths.map(path => `
+        ${paths.map(path => `
           <div class="path">
             <div class="path-header">
-              <div class="path-title">${path.title}</div>
+              <div class="path-title">${path.title || '未命名路径'}</div>
               <span class="path-status status-${path.status}">
                 ${path.status === 'completed' ? '已完成' :
                   path.status === 'in_progress' ? '进行中' :
                   path.status === 'paused' ? '已暂停' : '计划中'}
               </span>
             </div>
-            <p style="color: #666; margin-bottom: 15px;">${path.description}</p>
+            <p style="color: #666; margin-bottom: 15px;">${path.description || '暂无描述'}</p>
             <div class="progress-bar">
-              <div class="progress-fill" style="width: ${path.progress}%"></div>
+              <div class="progress-fill" style="width: ${path.progress || 0}%"></div>
             </div>
             <div style="text-align: right; font-size: 0.9rem; color: #666; margin-bottom: 15px;">
-              进度：${path.progress}%
+              进度：${path.progress || 0}%
             </div>
             <div class="milestones">
               <h4 style="margin-bottom: 10px; color: #495057;">里程碑</h4>
-              ${path.milestones.map(milestone => `
+              ${(path.milestones || []).map(milestone => `
                 <div class="milestone">
                   <div class="milestone-status ${milestone.completed ? 'milestone-completed' : 'milestone-pending'}"></div>
-                  <div class="milestone-title">${milestone.title}</div>
-                  <div class="milestone-date">${new Date(milestone.date).toLocaleDateString('zh-CN')}</div>
+                  <div class="milestone-title">${milestone.title || '未命名里程碑'}</div>
+                  <div class="milestone-date">${milestone.date ? new Date(milestone.date).toLocaleDateString('zh-CN') : '未设置日期'}</div>
                 </div>
               `).join('')}
             </div>
@@ -375,10 +381,10 @@ export const createPlanExportHTML = (plan: any, shareUrl?: string): string => {
       <div class="team-section">
         <h2 class="section-title">团队成员</h2>
         <div class="team-members">
-          ${plan.members.map(member => `
+          ${members.map(member => `
             <div class="member">
-              <div class="member-avatar">${member.name.charAt(0)}</div>
-              <span>${member.name}</span>
+              <div class="member-avatar">${(member.name || '?').charAt(0)}</div>
+              <span>${member.name || '未知成员'}</span>
             </div>
           `).join('')}
         </div>
@@ -387,7 +393,7 @@ export const createPlanExportHTML = (plan: any, shareUrl?: string): string => {
       <div class="tags-section">
         <h2 class="section-title">标签</h2>
         <div class="tags">
-          ${plan.tags.map(tag => `
+          ${tags.map(tag => `
             <span class="tag">${tag}</span>
           `).join('')}
         </div>
@@ -434,6 +440,13 @@ export const generateQRCode = async (text: string): Promise<string> => {
 // 导出为PDF
 export const exportToPDF = async (plan: any, shareUrl?: string): Promise<void> => {
   try {
+    // 验证计划数据
+    if (!plan) {
+      throw new Error('计划数据不存在');
+    }
+    
+    console.log('📋 开始导出PDF，计划数据:', plan);
+    
     // 创建临时容器
     const tempContainer = document.createElement('div');
     tempContainer.style.position = 'absolute';
@@ -486,20 +499,39 @@ export const exportToPDF = async (plan: any, shareUrl?: string): Promise<void> =
     }
 
     // 下载PDF
-    const fileName = `${plan.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_计划详情.pdf`;
+    const fileName = `${(plan.title || '未命名计划').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_计划详情.pdf`;
     pdf.save(fileName);
 
     // 清理临时容器
     document.body.removeChild(tempContainer);
+    
+    console.log('✅ PDF导出成功');
   } catch (error) {
-    console.error('PDF导出失败:', error);
-    throw new Error('PDF导出失败');
+    console.error('❌ PDF导出失败:', error);
+    
+    // 提供更详细的错误信息
+    if (error.message?.includes('Cannot read properties')) {
+      throw new Error('数据格式错误：计划数据不完整');
+    } else if (error.message?.includes('html2canvas')) {
+      throw new Error('图片生成失败：请检查页面内容');
+    } else if (error.message?.includes('jsPDF')) {
+      throw new Error('PDF生成失败：请稍后重试');
+    } else {
+      throw new Error(`PDF导出失败：${error.message || '未知错误'}`);
+    }
   }
 };
 
 // 导出为图片
 export const exportToImage = async (plan: any, format: 'png' | 'jpeg', shareUrl?: string): Promise<void> => {
   try {
+    // 验证计划数据
+    if (!plan) {
+      throw new Error('计划数据不存在');
+    }
+    
+    console.log(`🖼️ 开始导出${format.toUpperCase()}，计划数据:`, plan);
+    
     // 创建临时容器
     const tempContainer = document.createElement('div');
     tempContainer.style.position = 'absolute';
@@ -537,7 +569,7 @@ export const exportToImage = async (plan: any, format: 'png' | 'jpeg', shareUrl?
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${plan.title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_计划详情.${format}`;
+        link.download = `${(plan.title || '未命名计划').replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_')}_计划详情.${format}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -547,9 +579,21 @@ export const exportToImage = async (plan: any, format: 'png' | 'jpeg', shareUrl?
 
     // 清理临时容器
     document.body.removeChild(tempContainer);
+    
+    console.log(`✅ ${format.toUpperCase()}导出成功`);
   } catch (error) {
-    console.error(`${format.toUpperCase()}导出失败:`, error);
-    throw new Error(`${format.toUpperCase()}导出失败`);
+    console.error(`❌ ${format.toUpperCase()}导出失败:`, error);
+    
+    // 提供更详细的错误信息
+    if (error.message?.includes('Cannot read properties')) {
+      throw new Error('数据格式错误：计划数据不完整');
+    } else if (error.message?.includes('html2canvas')) {
+      throw new Error('图片生成失败：请检查页面内容');
+    } else if (error.message?.includes('toBlob')) {
+      throw new Error('图片保存失败：浏览器不支持该格式');
+    } else {
+      throw new Error(`${format.toUpperCase()}导出失败：${error.message || '未知错误'}`);
+    }
   }
 };
 

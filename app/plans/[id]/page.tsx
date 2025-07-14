@@ -30,6 +30,7 @@ import { ShareModal } from '@/components/core';
 import { ImageUpload } from '@/components/ui/ImageUpload';
 import { uploadImage } from '@/lib/services/uploadService';
 import { PlanDetailSkeleton } from '@/components/ui/Skeleton';
+import { getCategoryDisplayName, getBudgetDisplayFormat } from '@/lib/utils/categoryMapper';
 
 const generateActivityId = () => `act-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -436,13 +437,14 @@ const MilestoneItem: React.FC<{
     onCancelEdit(); // 退出编辑模式
   };
 
-  const handleToggleComplete = () => {
+  const handleToggleComplete = async () => {
     const newStatus = !milestone.completed;
+    
+    // 乐观更新：先更新UI，再同步数据库
+    console.log(`🔄 正在更新里程碑 "${milestone.title}" 状态: ${milestone.completed} → ${newStatus}`);
+    
+    // 直接调用更新函数，避免双重Toast
     onUpdate({ completed: newStatus });
-    toast.info(
-      '状态更新',
-      `里程碑 "${milestone.title}" 已标记为${newStatus ? '完成' : '未完成'}。`
-    );
   };
 
   return (
@@ -755,20 +757,67 @@ const PathsSection: React.FC<{
   };
 
   const updateMilestone = async (pathId: string, milestoneId: string, updates: Partial<any>) => {
+    // 保存原始状态以便回滚
+    const originalPlan = { ...plan };
+    
     try {
+      console.log(`💾 正在保存里程碑更新到数据库:`, { milestoneId, updates });
+      
+      // 先进行乐观更新：立即更新本地状态
+      setPlan(prevPlan => {
+        const newPlan = { ...prevPlan };
+        const path = newPlan.paths?.find(p => p.id === pathId);
+        if (path) {
+          const milestoneIndex = path.milestones?.findIndex(m => m.id === milestoneId);
+          if (milestoneIndex !== undefined && milestoneIndex >= 0 && path.milestones) {
+            path.milestones[milestoneIndex] = { ...path.milestones[milestoneIndex], ...updates };
+          }
+        }
+        return newPlan;
+      });
+      
+      // 然后同步到数据库
       await updateMilestoneDB(milestoneId, updates);
       
       const actionText = updates.completed !== undefined 
         ? (updates.completed ? '已完成' : '未完成')
         : '已更新';
       
-      toast.success('里程碑已更新', `里程碑状态：${actionText}`);
+      console.log(`✅ 里程碑状态更新成功: ${actionText}`);
       
-      // 重新加载计划数据以更新进度和状态
-      onReload();
+      // 找到里程碑所在的路径和标题
+      const path = (plan.paths || []).find(p => p.id === pathId);
+      const milestone = path?.milestones?.find(m => m.id === milestoneId);
+      const milestoneTitle = milestone?.title || '里程碑';
+      
+      toast.success(
+        '里程碑已更新', 
+        `"${milestoneTitle}" 已标记为${actionText}`
+      );
+      
+      // 只有在需要更新进度数据时才重新加载（比如完成状态改变）
+      if (updates.completed !== undefined) {
+        console.log('🔄 更新计划进度统计...');
+        // 延迟重新加载以避免闪烁
+        setTimeout(() => {
+          onReload();
+        }, 500);
+      }
+      
     } catch (error) {
-      console.error('Error updating milestone:', error);
-      toast.error('更新失败', '无法更新里程碑');
+      console.error('❌ 更新里程碑失败:', error);
+      
+      // 回滚本地状态
+      setPlan(originalPlan);
+      
+      // 提供更详细的错误信息
+      const errorMessage = error.message?.includes('JWT') 
+        ? '认证失败，请重新登录'
+        : error.message?.includes('RLS') 
+        ? '权限不足，无法更新里程碑'
+        : '网络错误，请稍后重试';
+      
+      toast.error('更新失败', errorMessage);
     }
   };
 
@@ -1277,9 +1326,7 @@ export default function PlanDetailPage() {
                     },
                     {
                       label: '预算使用',
-                      value: plan.metrics.totalBudget
-                        ? `¥${(plan.metrics.spentBudget || 0).toLocaleString()}/${plan.metrics.totalBudget.toLocaleString()}`
-                        : '未设置',
+                      value: getBudgetDisplayFormat(plan.metrics.totalBudget, plan.metrics.spentBudget),
                       icon: TrendingUp,
                       color: 'green'
                     }
@@ -1415,7 +1462,7 @@ export default function PlanDetailPage() {
                   <div className="space-y-3">
                     <div>
                       <p className="text-sm text-gray-400">分类</p>
-                      <p className="font-medium capitalize">{plan.category}</p>
+                      <p className="font-medium">{getCategoryDisplayName(plan.category)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-400">状态</p>
