@@ -611,9 +611,27 @@ export async function createPlan(plan: Omit<Plan, 'id' | 'created_at' | 'updated
 
 // 更新计划
 export async function updatePlan(planId: string, updates: Partial<Plan>) {
+  // 只保留数据库表中真实存在的字段，过滤掉前端特有的字段
+  const validFields = [
+    'title', 'description', 'cover_image', 'category', 'priority', 
+    'status', 'progress', 'start_date', 'target_date', 'tags', 'metrics'
+  ];
+  
+  const filteredUpdates: Partial<Plan> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    if (validFields.includes(key)) {
+      filteredUpdates[key as keyof Plan] = value;
+    }
+  }
+
+  // 确保 updated_at 总是被更新
+  filteredUpdates.updated_at = new Date().toISOString();
+
+  console.log('💾 更新计划字段:', Object.keys(filteredUpdates));
+
   const { data, error } = await supabase
     .from('plans')
-    .update(updates)
+    .update(filteredUpdates)
     .eq('id', planId)
     .select()
     .single()
