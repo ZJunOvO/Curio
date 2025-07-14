@@ -16,6 +16,7 @@ import {
   type FinanceRecord as DBFinanceRecord
 } from '@/lib/supabase/database'
 import { toast } from '@/lib/stores/useToastStore'
+import { TogetherPageSkeleton } from '@/components/ui/Skeleton'
 import { Heart, Users, Sparkles, TrendingUp, Calendar, Settings, Plus, DollarSign, TrendingDown, CheckCircle, Clock, ArrowUpRight, ArrowDownRight, Wallet, Receipt, Gift, Search, PieChart, LogIn, Link } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -149,11 +150,7 @@ export default function TogetherPage() {
 
   // 加载状态
   if (loading || authLoading) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-xl">加载中...</div>
-      </div>
-    )
+    return <TogetherPageSkeleton />;
   }
 
   // 获取活跃的绑定关系

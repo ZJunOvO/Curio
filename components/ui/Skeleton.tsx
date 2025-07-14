@@ -238,4 +238,151 @@ export function TableSkeleton({
   );
 }
 
+// 主页骨架屏（心愿页面）
+export function HomePageSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 text-white">
+      {/* 头部骨架 */}
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center mb-8">
+          <Skeleton className="w-64 h-12 mx-auto mb-4" />
+          <Skeleton className="w-96 h-6 mx-auto" />
+        </div>
+
+        {/* 统计卡片骨架 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="p-6 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+              <Skeleton className="w-20 h-8 mb-2" />
+              <Skeleton className="w-16 h-10 mb-1" />
+              <Skeleton className="w-24 h-4" />
+            </div>
+          ))}
+        </div>
+
+        {/* 心愿网格骨架 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="p-4 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+              <Skeleton className="w-full h-48 mb-4 rounded-lg" />
+              <Skeleton className="w-3/4 h-6 mb-2" />
+              <Skeleton className="w-full h-4 mb-4" />
+              <div className="flex items-center justify-between">
+                <Skeleton className="w-16 h-6" />
+                <Skeleton className="w-8 h-8 rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Together页面骨架屏
+export function TogetherPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <div className="container mx-auto px-8 py-8">
+        {/* 头部 */}
+        <div className="text-center mb-8">
+          <Skeleton className="w-48 h-10 mx-auto mb-4" />
+          <Skeleton className="w-80 h-6 mx-auto" />
+        </div>
+
+        {/* 内容区域 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* 左侧 */}
+          <div className="space-y-6">
+            <div className="p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
+              <Skeleton className="w-32 h-6 mb-4" />
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-black/20 rounded-lg">
+                    <Skeleton className="w-40 h-4" />
+                    <Skeleton className="w-16 h-6" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 右侧 */}
+          <div className="space-y-6">
+            <div className="p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
+              <Skeleton className="w-32 h-6 mb-4" />
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="p-3 bg-black/20 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <Skeleton className="w-24 h-4" />
+                      <Skeleton className="w-16 h-4" />
+                    </div>
+                    <Skeleton className="w-full h-3" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 个人资料页骨架屏
+export function ProfilePageSkeleton() {
+  return (
+    <div className="min-h-screen bg-black text-white">
+      <div className="container mx-auto px-8 py-8">
+        {/* 头部信息 */}
+        <div className="text-center mb-8">
+          <Skeleton circle className="w-32 h-32 mx-auto mb-4" />
+          <Skeleton className="w-48 h-8 mx-auto mb-2" />
+          <Skeleton className="w-64 h-5 mx-auto" />
+        </div>
+
+        {/* 统计信息 */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-6 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 text-center">
+              <Skeleton className="w-12 h-12 mx-auto mb-3" />
+              <Skeleton className="w-16 h-6 mx-auto mb-1" />
+              <Skeleton className="w-20 h-4 mx-auto" />
+            </div>
+          ))}
+        </div>
+
+        {/* 详细信息 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="p-6 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10">
+              <Skeleton className="w-32 h-6 mb-4" />
+              <ContentSkeleton lines={4} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 简单动画加载器（无文字）
+export function SimpleLoader({ size = 'md', className }: { size?: 'sm' | 'md' | 'lg'; className?: string }) {
+  const sizeClasses = {
+    sm: 'w-4 h-4',
+    md: 'w-6 h-6', 
+    lg: 'w-8 h-8'
+  };
+
+  return (
+    <div className={cn('flex items-center justify-center', className)}>
+      <div className={cn(
+        'border-2 border-white/20 border-t-white rounded-full animate-spin',
+        sizeClasses[size]
+      )} />
+    </div>
+  );
+}
+
 export default Skeleton;

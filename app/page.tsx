@@ -9,6 +9,7 @@ import { useUIStore } from '@/lib/stores/useUIStore'
 import { useAuth } from '@/hooks/useAuth'
 import { getUserWishes, updateWish, type Wish } from '@/lib/supabase/database'
 import { toast } from '@/lib/stores/useToastStore'
+import { HomePageSkeleton } from '@/components/ui/Skeleton'
 
 export default function HomePage() {
   const router = useRouter()
@@ -139,13 +140,7 @@ export default function HomePage() {
 
   // 加载状态
   if (loading || authLoading) {
-    return (
-      <div className="relative h-screen overflow-hidden bg-black">
-        <div className="h-full flex items-center justify-center">
-          <div className="text-white text-xl">加载中...</div>
-        </div>
-      </div>
-    )
+    return <HomePageSkeleton />;
   }
 
   // 流动视图 - 垂直滚动的沉浸式体验

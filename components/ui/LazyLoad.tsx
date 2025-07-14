@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, ReactNode } from 'react';
-import { Skeleton } from './Skeleton';
+import { Skeleton, SimpleLoader } from './Skeleton';
 
 export interface LazyLoadProps {
   children: ReactNode;
@@ -270,7 +270,7 @@ export function InfiniteScroll({
   const defaultLoadingComponent = (
     <div className="flex items-center justify-center py-8">
       <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-      <span className="ml-2 text-gray-400">加载中...</span>
+      <SimpleLoader size="sm" />
     </div>
   );
 

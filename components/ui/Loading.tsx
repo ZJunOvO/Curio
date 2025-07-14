@@ -53,7 +53,7 @@ export const Loading = React.forwardRef<HTMLDivElement, LoadingProps>(
           <CircularProgress
             size={size}
             color={color}
-            aria-label={label || '加载中...'}
+            aria-label={label || 'Loading...'}
             classNames={{
               base: sizeMap[size],
               svg: 'drop-shadow-md',
@@ -146,7 +146,7 @@ export const PageLoading = () => {
   return (
     <div className="fixed inset-0 bg-white dark:bg-black bg-opacity-50 backdrop-blur-sm z-50 flex items-center justify-center">
       <div className="bg-white dark:bg-apple-gray-900 rounded-apple-lg shadow-apple-xl p-8 mx-4">
-        <Loading size="lg" label="加载中..." />
+        <Loading size="lg" />
       </div>
     </div>
   )

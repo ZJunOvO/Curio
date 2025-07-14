@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { toast } from '@/lib/stores/useToastStore'
 import { cn } from '@/lib/utils'
 import { Eye, EyeOff, Heart, ArrowLeft } from 'lucide-react'
+import { SimpleLoader } from '@/components/ui/Skeleton'
 import { motion } from 'framer-motion'
 
 export default function LoginPage() {
@@ -42,7 +43,7 @@ export default function LoginPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">加载中...</div>
+        <SimpleLoader />
       </div>
     )
   }

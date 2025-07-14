@@ -18,6 +18,7 @@ import {
   TrendingUp, DollarSign, Calendar, Tag, User, Clock, CheckCircle, Edit, Search, 
   Trash2, Plus, ArrowUpRight, ArrowDownRight, Filter
 } from 'lucide-react'
+import { SimpleLoader } from '@/components/ui/Skeleton'
 
 const categoryIcons: Record<string, React.ReactNode> = {
   '餐饮': <Coffee className="w-4 h-4" />,
@@ -186,7 +187,7 @@ const FinanceTracker = React.forwardRef<HTMLDivElement, { className?: string }>(
       return (
         <div className={cn('p-6 bg-white/5 backdrop-blur-2xl rounded-2xl border border-white/10', className)} ref={ref}>
           <div className="text-center py-8">
-            <div className="text-gray-400">加载中...</div>
+            <SimpleLoader />
           </div>
         </div>
       )

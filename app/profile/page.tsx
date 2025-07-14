@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import { User, Mail, Heart, Users, ArrowLeft, Settings, LogOut } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { getUserProfile, getUserBindings, getPendingBindings, updateUserProfile, createBinding, respondToBinding, type UserProfile, type Binding } from '@/lib/supabase/database'
+import { ProfilePageSkeleton } from '@/components/ui/Skeleton'
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -115,11 +116,7 @@ export default function ProfilePage() {
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-white">加载中...</div>
-      </div>
-    )
+    return <ProfilePageSkeleton />;
   }
 
   if (!user) {

@@ -13,6 +13,7 @@ import {
 } from '@/lib/supabase/database'
 import { toast } from '@/lib/stores/useToastStore'
 import { CheckCircle2, Circle, Clock, AlertCircle, User, Trash2, Edit, Plus } from 'lucide-react'
+import { SimpleLoader } from '@/components/ui/Skeleton'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const TodoList = React.forwardRef<HTMLDivElement, { className?: string }>(
@@ -152,7 +153,7 @@ const TodoList = React.forwardRef<HTMLDivElement, { className?: string }>(
       return (
         <div className={cn('p-6 bg-white/5 backdrop-blur-2xl rounded-2xl border border-white/10', className)} ref={ref}>
           <div className="text-center py-8">
-            <div className="text-gray-400">加载中...</div>
+            <SimpleLoader />
           </div>
         </div>
       )
