@@ -12,7 +12,17 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { getPlanDetails, updatePlan, type Plan } from '@/lib/supabase/database';
+import { 
+  getPlanDetails, 
+  updatePlan, 
+  createPlanPath, 
+  updatePlanPath, 
+  deletePlanPath,
+  createMilestone,
+  updateMilestone as updateMilestoneDB,
+  deleteMilestone as deleteMilestoneDB,
+  type Plan 
+} from '@/lib/supabase/database';
 import { clearPlanCaches } from '@/lib/cache/CacheUtils';
 import { toast } from '@/lib/stores/useToastStore';
 import { PlanStatsDashboard } from '@/components/core/charts';
@@ -487,15 +497,23 @@ const MilestoneItem: React.FC<{
 
 // 新里程碑编辑器
 const NewMilestoneEditor: React.FC<{
-  onSave: (title: string) => void;
+  onSave: (title: string) => Promise<void>;
   onCancel: () => void;
 }> = ({ onSave, onCancel }) => {
   const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    if (title.trim()) {
-      onSave(title.trim());
-      setTitle('');
+  const handleSave = async () => {
+    if (title.trim() && !saving) {
+      setSaving(true);
+      try {
+        await onSave(title.trim());
+        setTitle('');
+      } catch (error) {
+        // Error is handled in saveNewMilestone function
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -515,8 +533,17 @@ const NewMilestoneEditor: React.FC<{
          />
        </div>
        <div className="flex items-center gap-2">
-          <button onClick={handleSave} className="p-1 text-green-400 hover:text-green-300" aria-label="保存新里程碑">
-            <CheckCircle className="w-4 h-4" />
+          <button 
+            onClick={handleSave} 
+            disabled={saving || !title.trim()}
+            className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50 disabled:cursor-not-allowed" 
+            aria-label="保存新里程碑"
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4" />
+            )}
           </button>
           <button onClick={onCancel} className="p-1 text-gray-400 hover:text-white" aria-label="取消添加">
             <XCircle className="w-4 h-4" />
@@ -528,15 +555,23 @@ const NewMilestoneEditor: React.FC<{
 
 // 新路径编辑器
 const NewPathEditor: React.FC<{
-  onSave: (title: string) => void;
+  onSave: (title: string) => Promise<void>;
   onCancel: () => void;
 }> = ({ onSave, onCancel }) => {
   const [title, setTitle] = useState('');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    if (title.trim()) {
-      onSave(title.trim());
-      setTitle('');
+  const handleSave = async () => {
+    if (title.trim() && !saving) {
+      setSaving(true);
+      try {
+        await onSave(title.trim());
+        setTitle('');
+      } catch (error) {
+        // Error is handled in addPath function
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
@@ -556,8 +591,17 @@ const NewPathEditor: React.FC<{
          />
        </div>
        <div className="flex items-center gap-2">
-          <button onClick={handleSave} className="p-1 text-green-400 hover:text-green-300" aria-label="保存新路径">
-            <CheckCircle className="w-4 h-4" />
+          <button 
+            onClick={handleSave} 
+            disabled={saving || !title.trim()}
+            className="p-1 text-green-400 hover:text-green-300 disabled:opacity-50 disabled:cursor-not-allowed" 
+            aria-label="保存新路径"
+          >
+            {saving ? (
+              <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <CheckCircle className="w-4 h-4" />
+            )}
           </button>
           <button onClick={onCancel} className="p-1 text-gray-400 hover:text-white" aria-label="取消添加">
             <XCircle className="w-4 h-4" />
@@ -571,7 +615,8 @@ const NewPathEditor: React.FC<{
 const PathsSection: React.FC<{
   plan: any;
   onUpdate: (updates: any) => void;
-}> = ({ plan, onUpdate }) => {
+  onReload: () => void;
+}> = ({ plan, onUpdate, onReload }) => {
   const [editingPathId, setEditingPathId] = useState<string | null>(null);
   const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
   const [newMilestonePathId, setNewMilestonePathId] = useState<string | null>(null);
@@ -622,57 +667,57 @@ const PathsSection: React.FC<{
   };
 
   // --- Path Logic ---
-  const addPath = (title: string) => {
-    const newPath = {
-      id: generateId(),
-      title,
-      description: '请填写路径描述',
-      startDate: plan.startDate,
-      endDate: plan.targetDate,
-      status: 'planning',
-      progress: 0,
-      milestones: [],
-    };
-    
-    const activity = createActivity('update', `添加了新的执行路径: "${title}"`);
-    onUpdate({
-      ...plan,
-      paths: [...(plan.paths || []), newPath]
-    });
-    setIsAddingPath(false);
+  const addPath = async (title: string) => {
+    try {
+      const pathData = {
+        plan_id: plan.id,
+        title,
+        description: '请填写路径描述',
+        start_date: plan.startDate,
+        target_date: plan.targetDate,
+        status: 'planning',
+        progress: 0,
+      };
+      
+      await createPlanPath(pathData);
+      toast.success('路径已添加', `新执行路径 "${title}" 已成功创建`);
+      setIsAddingPath(false);
+      
+      // 重新加载计划数据以显示新路径
+      onReload();
+    } catch (error) {
+      console.error('Error adding path:', error);
+      toast.error('添加失败', '无法创建新的执行路径');
+    }
   };
 
-  const updatePath = (pathId: string, updates: { title?: string; description?: string }) => {
-    const updatedPaths = (plan.paths || []).map(p => p.id === pathId ? { ...p, ...updates } : p);
-
-    const activity = createActivity('update', `更新了路径 "${updatedPaths.find(p=>p.id === pathId)?.title}" 的信息.`);
-    onUpdate({
-      ...plan,
-      paths: updatedPaths,
-      updatedAt: new Date(),
-     });
-    toast.success('执行路径已更新', '路径信息已成功保存。');
+  const updatePath = async (pathId: string, updates: { title?: string; description?: string }) => {
+    try {
+      await updatePlanPath(pathId, updates);
+      toast.success('执行路径已更新', '路径信息已成功保存');
+      
+      // 重新加载计划数据以显示更新
+      onReload();
+    } catch (error) {
+      console.error('Error updating path:', error);
+      toast.error('更新失败', '无法更新执行路径');
+    }
   };
 
-  const deletePath = (pathId: string) => {
+  const deletePath = async (pathId: string) => {
     const pathToDelete = (plan.paths || []).find(p => p.id === pathId);
     if (!pathToDelete) return;
 
-    const updatedPaths = (plan.paths || []).filter(p => p.id !== pathId);
-    const { status: newPlanStatus, progress: newPlanProgress, metrics: newMetrics } = recalculatePlanStatus(updatedPaths);
-
-    const activity = createActivity('update', `删除了执行路径: "${pathToDelete.title}"`);
-
-    onUpdate({
-      ...plan,
-      paths: updatedPaths,
-      status: newPlanStatus,
-      progress: newPlanProgress,
-      metrics: newMetrics,
-      updatedAt: new Date(),
-    });
-
-    toast.warning('执行路径已删除', `路径 "${pathToDelete.title}" 已被删除。`);
+    try {
+      await deletePlanPath(pathId);
+      toast.warning('执行路径已删除', `路径 "${pathToDelete.title}" 已被删除`);
+      
+      // 重新加载计划数据以更新进度和状态
+      onReload();
+    } catch (error) {
+      console.error('Error deleting path:', error);
+      toast.error('删除失败', '无法删除执行路径');
+    }
   };
 
   const handleUpdatePath = (pathId: string, updates: { title?: string; description?: string }) => {
@@ -684,128 +729,65 @@ const PathsSection: React.FC<{
     setNewMilestonePathId(pathId);
   };
   
-  const saveNewMilestone = (pathId: string, title: string) => {
-    const newMilestone = {
-      id: generateId(),
-      title,
-      date: new Date(),
-      completed: false,
-    };
-    const updatedPaths = (plan.paths || []).map(p =>
-      p.id === pathId
-        ? { ...p, milestones: [...(p.milestones || []), newMilestone] }
-        : p
-    );
-    onUpdate({ ...plan, paths: updatedPaths });
-    toast.success('里程碑已添加', `新的里程碑 "${title}" 已成功添加。`);
-    setNewMilestonePathId(null);
+  const saveNewMilestone = async (pathId: string, title: string) => {
+    try {
+      const milestoneData = {
+        path_id: pathId,
+        title,
+        target_date: new Date().toISOString(),
+        completed: false,
+      };
+      
+      await createMilestone(milestoneData);
+      toast.success('里程碑已添加', `新的里程碑 "${title}" 已成功添加`);
+      setNewMilestonePathId(null);
+      
+      // 重新加载计划数据以显示新里程碑
+      onReload();
+    } catch (error) {
+      console.error('Error creating milestone:', error);
+      toast.error('添加失败', '无法创建新的里程碑');
+    }
   };
 
   const cancelAddNewMilestone = () => {
     setNewMilestonePathId(null);
   };
 
-  const updateMilestone = (pathId: string, milestoneId: string, updates: Partial<any>) => {
-    let milestoneTitle = '';
-    let milestoneCompleted: boolean | undefined;
-    let newActivities: any[] = [];
-
-    const updatedPaths = (plan.paths || []).map(path => {
-      if (path.id === pathId) {
-        const originalPath = { ...path };
-        const updatedMilestones = (path.milestones || []).map(m => {
-          if (m.id === milestoneId) {
-            milestoneTitle = m.title;
-            if (updates.completed !== undefined && m.completed !== updates.completed) {
-              milestoneCompleted = updates.completed;
-            }
-            return { ...m, ...updates };
-          }
-          return m;
-        });
-
-        // Check if all milestones in this path are completed
-        const allMilestonesCompleted = updatedMilestones.every(m => m.completed);
-        const newPathStatus = allMilestonesCompleted ? 'completed' : 'in_progress';
-        
-        if (originalPath.status !== newPathStatus) {
-           newActivities.push(createActivity('status_change', `路径 "${originalPath.title}" 的状态更新为: ${newPathStatus === 'completed' ? '已完成' : '进行中'}`));
-        }
-        
-        const completedCount = updatedMilestones?.filter(m => m.completed)?.length || 0;
-        const progress = (updatedMilestones?.length || 0) > 0 ? Math.round((completedCount / updatedMilestones.length) * 100) : 0;
-
-        return { ...path, milestones: updatedMilestones, status: newPathStatus, progress: progress };
-      }
-      return path;
-    });
-
-    if (milestoneCompleted !== undefined) {
-      newActivities.push(createActivity('milestone', `里程碑 "${milestoneTitle}" 标记为${milestoneCompleted ? '完成' : '未完成'}`));
+  const updateMilestone = async (pathId: string, milestoneId: string, updates: Partial<any>) => {
+    try {
+      await updateMilestoneDB(milestoneId, updates);
+      
+      const actionText = updates.completed !== undefined 
+        ? (updates.completed ? '已完成' : '未完成')
+        : '已更新';
+      
+      toast.success('里程碑已更新', `里程碑状态：${actionText}`);
+      
+      // 重新加载计划数据以更新进度和状态
+      onReload();
+    } catch (error) {
+      console.error('Error updating milestone:', error);
+      toast.error('更新失败', '无法更新里程碑');
     }
-
-    const { status: newPlanStatus, progress: newPlanProgress, metrics: newMetrics } = recalculatePlanStatus(updatedPaths);
-    
-    if (plan.status !== newPlanStatus) {
-        newActivities.push(createActivity('status_change', `计划状态更新为: ${newPlanStatus === 'completed' ? '已完成' : '进行中'}`));
-    }
-
-    onUpdate({
-      ...plan,
-      paths: updatedPaths,
-      status: newPlanStatus,
-      progress: newPlanProgress,
-      metrics: newMetrics,
-      updatedAt: new Date(), // Update timestamp
-    });
   };
 
-  const deleteMilestone = (pathId: string, milestoneId: string) => {
+  const deleteMilestone = async (pathId: string, milestoneId: string) => {
     const path = (plan.paths || []).find(p => p.id === pathId);
     if (!path) return;
-    const milestone = path.milestones.find(m => m.id === milestoneId);
+    const milestone = path.milestones?.find(m => m.id === milestoneId);
     if (!milestone) return;
 
-    let updatedPaths = (plan.paths || []).map(p => 
-      p.id === pathId 
-        ? { ...p, milestones: (p.milestones || []).filter(m => m.id !== milestoneId) } 
-        : p
-    );
-    
-    // After deleting a milestone, we must also recalculate the status and progress of the affected path
-    updatedPaths = updatedPaths.map(currentPath => {
-      if (currentPath.id === pathId) {
-        const completedCount = currentPath.milestones?.filter(m => m.completed)?.length || 0;
-        const progress = (currentPath.milestones?.length || 0) > 0 ? Math.round((completedCount / currentPath.milestones.length) * 100) : 0;
-        
-        let newPathStatus = 'planning';
-        if ((currentPath.milestones?.length || 0) > 0) {
-          if (progress === 100) {
-            newPathStatus = 'completed';
-          } else if (progress > 0) {
-            newPathStatus = 'in_progress';
-          }
-        }
-        
-        return { ...currentPath, status: newPathStatus, progress: progress };
-      }
-      return currentPath;
-    });
-
-    const { status: newPlanStatus, progress: newPlanProgress, metrics: newMetrics } = recalculatePlanStatus(updatedPaths);
-
-    const activity = createActivity('milestone', `删除了里程碑: "${milestone.title}"`);
-
-    onUpdate({
-      ...plan,
-      paths: updatedPaths,
-      status: newPlanStatus,
-      progress: newPlanProgress,
-      metrics: newMetrics,
-      updatedAt: new Date(),
-    });
-
-    toast.warning('里程碑已删除', `里程碑 "${milestone.title}" 已被删除。`);
+    try {
+      await deleteMilestoneDB(milestoneId);
+      toast.warning('里程碑已删除', `里程碑 "${milestone.title}" 已被删除`);
+      
+      // 重新加载计划数据以更新进度和状态
+      onReload();
+    } catch (error) {
+      console.error('Error deleting milestone:', error);
+      toast.error('删除失败', '无法删除里程碑');
+    }
   };
 
   return (
@@ -1486,7 +1468,7 @@ export default function PlanDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <PathsSection plan={plan} onUpdate={handlePlanUpdate} />
+              <PathsSection plan={plan} onUpdate={handlePlanUpdate} onReload={loadPlan} />
             </motion.div>
           )}
 
