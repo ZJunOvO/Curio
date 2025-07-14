@@ -17,6 +17,9 @@ import { clearPlanCaches } from '@/lib/cache/CacheUtils';
 import { toast } from '@/lib/stores/useToastStore';
 import { PlanStatsDashboard } from '@/components/core/charts';
 import { ShareModal } from '@/components/core';
+import { ImageUpload } from '@/components/ui/ImageUpload';
+import { uploadImage } from '@/lib/services/uploadService';
+import { PlanDetailSkeleton } from '@/components/ui/Skeleton';
 
 const generateActivityId = () => `act-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -65,12 +68,12 @@ const ApprovalSection: React.FC<{ plan: Plan; onUpdate: (updatedPlan: Plan) => v
     };
     
     const activity = createActivity('comment', `发表了审批意见: "${approvalComment}"`);
-    onUpdate({
-      ...plan,
-      approvals: [...(plan.approvals || []), newApproval],
-      activities: [...(plan.activities || []), activity],
-      updatedAt: new Date(),
-    });
+    // TODO: 实现审批功能，approvals应该是独立的表
+    // onUpdate({
+    //   ...plan,
+    //   approvals: [...(plan.approvals || []), newApproval],
+    //   updatedAt: new Date(),
+    // });
 
     toast.success('意见提交成功', '你的审批意见已被记录。');
     setShowApprovalForm(false);
@@ -307,10 +310,10 @@ const MembersSection: React.FC<{ plan: any, onUpdate: (updates: any) => void }> 
   const handleInvite = () => {
     if (inviteEmail && inviteEmail.includes('@')) {
       const activity = createActivity('member', `邀请了新成员: ${inviteEmail}`);
-      onUpdate({
-        ...plan,
-        activities: [...(plan.activities || []), activity]
-      });
+      // TODO: 实现成员邀请功能
+      // onUpdate({
+      //   ...plan
+      // });
       toast.info(`邀请已发送至 ${inviteEmail}`, '成员接受邀请后将出现在列表中。');
       setInviteEmail('');
       setShowInviteForm(false);
@@ -634,8 +637,7 @@ const PathsSection: React.FC<{
     const activity = createActivity('update', `添加了新的执行路径: "${title}"`);
     onUpdate({
       ...plan,
-      paths: [...(plan.paths || []), newPath],
-      activities: [...plan.activities, activity]
+      paths: [...(plan.paths || []), newPath]
     });
     setIsAddingPath(false);
   };
@@ -647,7 +649,6 @@ const PathsSection: React.FC<{
     onUpdate({
       ...plan,
       paths: updatedPaths,
-      activities: [...(plan.activities || []), activity],
       updatedAt: new Date(),
      });
     toast.success('执行路径已更新', '路径信息已成功保存。');
@@ -668,7 +669,6 @@ const PathsSection: React.FC<{
       status: newPlanStatus,
       progress: newPlanProgress,
       metrics: newMetrics,
-      activities: [...(plan.activities || []), activity],
       updatedAt: new Date(),
     });
 
@@ -756,7 +756,6 @@ const PathsSection: React.FC<{
       status: newPlanStatus,
       progress: newPlanProgress,
       metrics: newMetrics,
-      activities: [...(plan.activities || []), ...newActivities],
       updatedAt: new Date(), // Update timestamp
     });
   };
@@ -803,7 +802,6 @@ const PathsSection: React.FC<{
       status: newPlanStatus,
       progress: newPlanProgress,
       metrics: newMetrics,
-      activities: [...(plan.activities || []), activity],
       updatedAt: new Date(),
     });
 
@@ -1066,6 +1064,7 @@ export default function PlanDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'paths' | 'versions' | 'members' | 'approvals' | 'activity' | 'stats'>('overview');
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showCoverEditor, setShowCoverEditor] = useState(false);
 
   useEffect(() => {
     if (user && params.id) {
@@ -1088,14 +1087,7 @@ export default function PlanDetailPage() {
   };
 
   if (loading || !plan) {
-    return (
-      <div className="min-h-screen bg-black text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p>加载中...</p>
-        </div>
-      </div>
-    );
+    return <PlanDetailSkeleton />;
   }
 
   const handlePlanUpdate = async (updates: any) => {
@@ -1110,6 +1102,28 @@ export default function PlanDetailPage() {
     } catch (error) {
       console.error('更新计划失败:', error);
       toast.error('更新失败', '请稍后重试');
+    }
+  };
+
+  const handleCoverUpload = async (file: File): Promise<string> => {
+    try {
+      const imageUrl = await uploadImage(file, 'plan-covers');
+      
+      // 更新计划封面
+      await handlePlanUpdate({ cover_image: imageUrl });
+      
+      toast.success('封面上传成功', '计划封面已更新');
+      return imageUrl;
+    } catch (error) {
+      console.error('封面上传失败:', error);
+      toast.error('上传失败', '请检查网络连接后重试');
+      throw error;
+    }
+  };
+
+  const handleCoverChange = (url: string | null) => {
+    if (url) {
+      setPlan(prev => ({ ...prev, coverImage: url }));
     }
   };
 
@@ -1139,6 +1153,13 @@ export default function PlanDetailPage() {
           
           {/* 操作按钮组 */}
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowCoverEditor(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 hover:bg-white/20 hover:border-white/30 transition-all duration-200 text-white shadow-lg"
+            >
+              <Edit className="w-4 h-4" />
+              编辑封面
+            </button>
             <button
               onClick={() => setShowShareModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 hover:bg-white/20 hover:border-white/30 transition-all duration-200 text-white shadow-lg"
@@ -1530,6 +1551,56 @@ export default function PlanDetailPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* 封面编辑模态框 */}
+      <AnimatePresence>
+        {showCoverEditor && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowCoverEditor(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 w-full max-w-md"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-white">编辑计划封面</h3>
+                <button
+                  onClick={() => setShowCoverEditor(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-white" />
+                </button>
+              </div>
+
+              <ImageUpload
+                value={plan?.coverImage}
+                onChange={handleCoverChange}
+                onUpload={handleCoverUpload}
+                aspectRatio="16:9"
+                placeholder="上传新的计划封面"
+                maxSize={5}
+                className="mb-4"
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setShowCoverEditor(false)}
+                  className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                >
+                  取消
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* 分享模态框 */}
       <ShareModal

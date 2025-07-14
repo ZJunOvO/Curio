@@ -8,6 +8,7 @@ import { Plus, Search, Clock, Zap, LayoutGrid, GitBranch, Trello, LogIn } from '
 import { useAuth } from '@/hooks/useAuth';
 import { getUserPlans, testDatabaseConnection, type Plan } from '@/lib/supabase/database';
 import { toast } from '@/lib/stores/useToastStore';
+import { PlanListSkeleton } from '@/components/ui/Skeleton';
 
 const getPriorityIcon = (priority: string) => {
   if (priority === 'high') return <Zap className="w-4 h-4 text-red-400" />;
@@ -171,11 +172,7 @@ export default function PlansPage() {
 
   // 加载状态
   if (loading || authLoading) {
-    return (
-      <div className="bg-black min-h-screen text-white flex items-center justify-center">
-        <div className="text-xl">加载中...</div>
-      </div>
-    );
+    return <PlanListSkeleton />;
   }
 
   return (
